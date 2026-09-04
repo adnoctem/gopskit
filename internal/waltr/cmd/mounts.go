@@ -7,10 +7,10 @@ import (
 
 	"github.com/fmjstudios/gopskit/internal/waltr/app"
 	cmdutil "github.com/fmjstudios/gopskit/internal/waltr/util"
+	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
 	"github.com/fmjstudios/gopskit/pkg/core"
 	"github.com/fmjstudios/gopskit/pkg/helpers"
 	"github.com/fmjstudios/gopskit/pkg/proc"
-	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +56,9 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmdutil.WaitUntilRunning(app, *vaultLeaderPod)
+			if err := cmdutil.WaitUntilRunning(app, *vaultLeaderPod); err != nil {
+				return err
+			}
 
 			if token == "" {
 				app.Log.Debug("'token' option is unset, falling back to credentials in cache path!")
@@ -74,16 +76,17 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 			app.Log.Infof("Port-forwarding Vault instance: %s", pods[0].Name)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			go func() {
-				err := app.Kube.PortForward(ctx, pods[0])
+			readyChan := make(chan struct{})
+			go func(rc chan struct{}) {
+				err := app.Kube.PortForward(ctx, pods[0], rc)
 				if err != nil {
 					panic(err)
 				}
-			}()
+			}(readyChan)
+			<-readyChan
 
 			// add token
-			err = app.VaultClient.SetToken(token)
-			if err != nil {
+			if err := app.Vault.SetToken(&apivault.Credentials{Token: token}); err != nil {
 				return fmt.Errorf("could not set token: %v", err)
 			}
 
@@ -109,7 +112,7 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 				}
 
 				// enable
-				_, err = app.VaultClient.System.AuthEnableMethod(context.Background(), strings.TrimSuffix(kp, "/"),
+				err = app.Vault.AuthEnableMethod(context.Background(), strings.TrimSuffix(kp, "/"),
 					schema.AuthEnableMethodRequest{
 						Description: "authenticate with Kubernetes Service Account Tokens",
 						Type:        strings.TrimSuffix(kp, "/"),
@@ -120,9 +123,10 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 				}
 
 				// configure
-				_, err = app.VaultClient.Auth.KubernetesConfigureAuth(context.Background(), schema.KubernetesConfigureAuthRequest{
-					KubernetesHost: fmt.Sprintf("https://%s:%d", svc.Spec.ClusterIP, svc.Spec.Ports[0].Port),
-				}, vault.WithMountPath(strings.TrimSuffix(kp, "/")))
+				err = app.Vault.KubernetesConfigureAuth(context.Background(), strings.TrimSuffix(kp, "/"),
+					schema.KubernetesConfigureAuthRequest{
+						KubernetesHost: fmt.Sprintf("https://%s:%d", svc.Spec.ClusterIP, svc.Spec.Ports[0].Port),
+					})
 
 				if err != nil {
 					return fmt.Errorf("could not configure Vault authentication method Kubernetes: %v", err)
@@ -136,7 +140,7 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 			// enable OIDC
 			const op = "oidc/"
 			if !helpers.SliceContains(m, op) {
-				_, err := app.VaultClient.System.AuthEnableMethod(context.Background(), strings.TrimSuffix(op, "/"),
+				err := app.Vault.AuthEnableMethod(context.Background(), strings.TrimSuffix(op, "/"),
 					schema.AuthEnableMethodRequest{
 						Type:        "oidc",
 						Description: "authenticate with OpenID Connect",
@@ -160,7 +164,7 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 			// enable KV-V2
 			const kvp = "kv/"
 			if !helpers.SliceContains(s, kvp) {
-				_, err := app.VaultClient.System.MountsEnableSecretsEngine(context.Background(),
+				err := app.Vault.MountsEnableSecretsEngine(context.Background(),
 					strings.TrimSuffix(kvp, "/"),
 					schema.MountsEnableSecretsEngineRequest{
 						Type:        "kv-v2",

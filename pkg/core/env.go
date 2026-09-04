@@ -15,6 +15,10 @@ const (
 
 // String implements the Stringer interface
 func (e Environment) String() string {
+	if e < Development || e > Production {
+		return "unknown"
+	}
+
 	return [...]string{"dev", "stage", "prod"}[e-1]
 }
 

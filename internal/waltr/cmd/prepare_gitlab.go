@@ -6,6 +6,7 @@ import (
 
 	"github.com/fmjstudios/gopskit/internal/waltr/app"
 	"github.com/fmjstudios/gopskit/internal/waltr/util"
+	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
 	"github.com/fmjstudios/gopskit/pkg/core"
 	"github.com/fmjstudios/gopskit/pkg/helpers"
 	"github.com/fmjstudios/gopskit/pkg/proc"
@@ -51,16 +52,17 @@ func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 			app.Log.Infof("Port-forwarding Vault instance: %s", pods[0].Name)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			go func() {
-				err := app.Kube.PortForward(ctx, pods[0])
+			readyChan := make(chan struct{})
+			go func(rc chan struct{}) {
+				err := app.Kube.PortForward(ctx, pods[0], rc)
 				if err != nil {
 					panic(err)
 				}
-			}()
+			}(readyChan)
+			<-readyChan
 
 			// add token
-			err = app.VaultClient.SetToken(token)
-			if err != nil {
+			if err := app.Vault.SetToken(&apivault.Credentials{Token: token}); err != nil {
 				return fmt.Errorf("could not set token: %v", err)
 			}
 
@@ -71,8 +73,8 @@ func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 				return err
 			}
 
-			if helpers.SliceContains(rola, r) && overwrite || !helpers.SliceContains(rola, r) {
-				_, err := app.VaultClient.Auth.KubernetesWriteAuthRole(context.Background(), r,
+			if !helpers.SliceContains(rola, r) || overwrite {
+				err := app.Vault.KubernetesWriteAuthRole(context.Background(), r,
 					schema.KubernetesWriteAuthRoleRequest{
 						Audience:                      "vault",
 						BoundServiceAccountNames:      []string{r},
@@ -100,14 +102,11 @@ func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 				return err
 			}
 
-			var adminExists bool = util.HasKvV2Secret(app, adminPath, "kv/")
-			if adminExists && overwrite || !adminExists {
-				err := util.WriteKvV2Secret(app, adminPath, "kv/", schema.KvV2WriteRequest{
-					Data: map[string]interface{}{
-						"username": "mg",
-						"password": adminPass,
-					},
-					Options: nil,
+			adminExists := util.HasKvV2Secret(app, adminPath, "kv/")
+			if !adminExists || overwrite {
+				err := util.WriteKvV2Secret(app, adminPath, "kv/", map[string]interface{}{
+					"username": "mg",
+					"password": adminPass,
 				})
 
 				if err != nil {
@@ -126,14 +125,11 @@ func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 				return err
 			}
 
-			var redisExists bool = util.HasKvV2Secret(app, redisPath, "kv/")
-			if redisExists && overwrite || !redisExists {
-				err := util.WriteKvV2Secret(app, redisPath, "kv/", schema.KvV2WriteRequest{
-					Data: map[string]interface{}{
-						"username": "redis",
-						"password": redisPass,
-					},
-					Options: nil,
+			redisExists := util.HasKvV2Secret(app, redisPath, "kv/")
+			if !redisExists || overwrite {
+				err := util.WriteKvV2Secret(app, redisPath, "kv/", map[string]interface{}{
+					"username": "redis",
+					"password": redisPass,
 				})
 
 				if err != nil {
@@ -152,14 +148,11 @@ func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 				return err
 			}
 
-			var psqlExists bool = util.HasKvV2Secret(app, psqlPath, "kv/")
-			if psqlExists && overwrite || !psqlExists {
-				err := util.WriteKvV2Secret(app, psqlPath, "kv/", schema.KvV2WriteRequest{
-					Data: map[string]interface{}{
-						"username": "gitlab",
-						"password": psqlPass,
-					},
-					Options: nil,
+			psqlExists := util.HasKvV2Secret(app, psqlPath, "kv/")
+			if !psqlExists || overwrite {
+				err := util.WriteKvV2Secret(app, psqlPath, "kv/", map[string]interface{}{
+					"username": "gitlab",
+					"password": psqlPass,
 				})
 
 				if err != nil {
@@ -183,14 +176,11 @@ func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 				return err
 			}
 
-			var minioExists bool = util.HasKvV2Secret(app, minioPath, "kv/")
-			if minioExists && overwrite || !minioExists {
-				err := util.WriteKvV2Secret(app, minioPath, "kv/", schema.KvV2WriteRequest{
-					Data: map[string]interface{}{
-						"access_key": minioAccessKey,
-						"secret_key": minioSecretKey,
-					},
-					Options: nil,
+			minioExists := util.HasKvV2Secret(app, minioPath, "kv/")
+			if !minioExists || overwrite {
+				err := util.WriteKvV2Secret(app, minioPath, "kv/", map[string]interface{}{
+					"access_key": minioAccessKey,
+					"secret_key": minioSecretKey,
 				})
 
 				if err != nil {

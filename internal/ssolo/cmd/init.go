@@ -36,7 +36,7 @@ func NewInitCommand(app *app.State) *cobra.Command {
 			label := proc.Must(cmd.Flags().GetString("label"))
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 
-			var basicAuth, secretAuth bool = true, false
+			var basicAuth, secretAuth bool
 			var podNamespace string
 			var leaderPod *corev1.Pod
 
@@ -44,9 +44,9 @@ func NewInitCommand(app *app.State) *cobra.Command {
 			switch {
 			case secretName != "":
 				secretAuth = true
-			case username != "" && password == "":
+			case username != "" && password != "":
 				basicAuth = true
-			case secretName == "" && username == "" || password == "":
+			default:
 				return fmt.Errorf("impossible to authenticate to Keycloak without providing username/password or a Secret")
 			}
 
@@ -162,7 +162,7 @@ func NewInitCommand(app *app.State) *cobra.Command {
 				}
 
 				if exists {
-					app.Log.Infof("skpping creation of Keycloak realm: %s. Realm already exists.", *v.Realm)
+					app.Log.Infof("skipping creation of Keycloak realm: %s. Realm already exists.", *v.Realm)
 					continue
 				}
 

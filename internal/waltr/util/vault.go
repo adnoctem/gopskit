@@ -2,19 +2,16 @@ package util
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/fmjstudios/gopskit/internal/waltr/app"
+	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
 	"github.com/fmjstudios/gopskit/pkg/core"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
 	"github.com/fmjstudios/gopskit/pkg/helpers"
 	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/vault-client-go"
-	"github.com/hashicorp/vault-client-go/schema"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -31,13 +28,6 @@ type SealConfig struct {
 	Remain hcl.Body `hcl:",remain"`
 }
 
-// Credentials is a custom type which is used to write and load Vault credentials to and from a file
-type Credentials struct {
-	Keys       []string `json:"keys"`
-	KeysBase64 []string `json:"keys_base64"`
-	Token      string   `json:"token"`
-}
-
 // CredentialPath builds the filesystem path to write the credentials to after we unseal the Vault,
 // since it most likely is required for later commands. This function make the path deterministic
 // per execution env.Environment.
@@ -45,46 +35,44 @@ func CredentialPath(a *app.State, env core.Environment) string {
 	return filepath.Join(a.Paths.Cache, env.String(), "vault-credentials.json")
 }
 
-// WriteCredentials writes the Vault Credentials to the CredentialPath for the given env.Environment
-func WriteCredentials(a *app.State, env core.Environment, credentials *Credentials) error {
-	p := CredentialPath(a, env)
-	jsn, err := json.MarshalIndent(credentials, "", "  ")
-	if err != nil {
+// WriteCredentials persists the given Vault credentials to the CredentialPath for env, and makes
+// them the active token for subsequent Vault API calls.
+func WriteCredentials(a *app.State, env core.Environment, credentials *apivault.Credentials) error {
+	a.Vault.SetAuthPath(CredentialPath(a, env))
+	if err := a.Vault.SetToken(credentials); err != nil {
 		return err
 	}
 
-	return fs.Write(p, jsn)
+	return a.Vault.Token().Save()
 }
 
-// ReadCredentials reads the Vault Credentials from the CredentialPath for the given env.Environment
-func ReadCredentials(a *app.State, env core.Environment) (*Credentials, error) {
-	p := CredentialPath(a, env)
-	raw, err := fs.Read(p)
-	if err != nil {
+// ReadCredentials reads previously-persisted Vault credentials from the CredentialPath for env
+func ReadCredentials(a *app.State, env core.Environment) (*apivault.Credentials, error) {
+	a.Vault.SetAuthPath(CredentialPath(a, env))
+
+	creds := a.Vault.Token()
+	if err := creds.Load(); err != nil {
 		return nil, err
 	}
 
-	var credentials Credentials
-	err = json.Unmarshal(raw, &credentials)
-	if err != nil {
-		return nil, err
+	asserted, ok := creds.(*apivault.Credentials)
+	if !ok {
+		return nil, fmt.Errorf("loaded Vault credentials have an unexpected type")
 	}
 
-	return &credentials, nil
+	return asserted, nil
 }
 
 // AuthMethods retrieves the list of enabled authentication methods from the current Vault instance
 func AuthMethods(a *app.State) ([]string, error) {
-	// get current methods
-	m, err := a.VaultClient.System.AuthListEnabledMethods(context.Background())
+	m, err := a.Vault.AuthListEnabledMethods(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("could not list enabled Vault authentication methods: %v", err)
 	}
 
-	var methods []string
-	for k := range m.Data {
+	methods := make([]string, 0, len(m))
+	for k := range m {
 		methods = append(methods, k)
-		continue
 	}
 
 	return methods, nil
@@ -92,16 +80,14 @@ func AuthMethods(a *app.State) ([]string, error) {
 
 // SecretsEngines retrieves the list of enabled secrets engines from the current Vault instance
 func SecretsEngines(a *app.State) ([]string, error) {
-	// get current secrets engines
-	s, err := a.VaultClient.System.MountsListSecretsEngines(context.Background())
+	s, err := a.Vault.MountsListSecretsEngines(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("could not list secrets engines: %v", err)
 	}
 
-	var engines []string
-	for k := range s.Data {
+	engines := make([]string, 0, len(s))
+	for k := range s {
 		engines = append(engines, k)
-		continue
 	}
 
 	return engines, nil
@@ -109,54 +95,52 @@ func SecretsEngines(a *app.State) ([]string, error) {
 
 // Policies retrieves a list of the currently enabled policies
 func Policies(a *app.State) ([]string, error) {
-	p, err := a.VaultClient.System.PoliciesListAclPolicies(context.Background())
+	p, err := a.Vault.PoliciesListAclPolicies(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("could not list policies: %v", err)
 	}
 
-	return p.Data.Keys, nil
+	return p, nil
 }
 
 // PasswordPolicies retrieves a list of the currently enabled password policies
 func PasswordPolicies(a *app.State) ([]string, error) {
-	p, err := a.VaultClient.System.PoliciesListPasswordPolicies(context.Background())
+	p, err := a.Vault.PoliciesListPasswordPolicies(context.Background())
 	if err != nil {
 		// mitigate empty policies
-		if strings.Contains(err.Error(), "404 Not Found") {
+		if apivault.IsNotFound(err) {
 			return []string{}, nil
 		}
 
 		return nil, fmt.Errorf("could not list password policies: %v", err)
 	}
 
-	return p.Data.Keys, nil
+	return p, nil
 }
 
 // KubernetesAuthRoles retrieves a list of the currently enabled Kubernetes Auth roles within Vault
 func KubernetesAuthRoles(a *app.State) ([]string, error) {
-	k, err := a.VaultClient.Auth.KubernetesListAuthRoles(context.Background())
+	k, err := a.Vault.KubernetesListAuthRoles(context.Background())
 	if err != nil {
 		// mitigate empty policies
-		if strings.Contains(err.Error(), "404 Not Found") {
+		if apivault.IsNotFound(err) {
 			return []string{}, nil
 		}
 
 		return nil, fmt.Errorf("could not list Kubernetes Auth roles: %v", err)
 	}
 
-	return k.Data.Keys, nil
+	return k, nil
 }
 
-// GeneratePasswordFromPolicy ...
+// GeneratePasswordFromPolicy generates a new password using the named Vault password policy
 func GeneratePasswordFromPolicy(a *app.State, policy string) (string, error) {
-	pass, err := a.VaultClient.System.PoliciesGeneratePasswordFromPasswordPolicy(
-		context.Background(),
-		policy,
-	)
+	pass, err := a.Vault.PoliciesGeneratePasswordFromPasswordPolicy(context.Background(), policy)
 	if err != nil {
 		return "", fmt.Errorf("could not generate password: %v", err)
 	}
-	return pass.Data.Password, nil
+
+	return pass, nil
 }
 
 // Pods returns a list of Kubernetes' Pods matching the default (or custom) Vault label
@@ -178,8 +162,9 @@ func Pods(a *app.State, namespace, label string) ([]corev1.Pod, error) {
 	return pods, nil
 }
 
+// LeaderPod determines the Vault leader (active) Pod from a set of candidate pods, preferring the
+// "vault-active=true" label and falling back to the StatefulSet's ordinal-0 replica.
 func LeaderPod(a *app.State, pods []corev1.Pod, namespace, label string) (*corev1.Pod, error) {
-	var leader *corev1.Pod
 	var activePods []corev1.Pod
 	var err error
 
@@ -202,25 +187,25 @@ func LeaderPod(a *app.State, pods []corev1.Pod, namespace, label string) (*corev
 
 	// no pod is labeled with "vault-active=true"
 	if len(activePods) == 0 {
-		for _, pod := range pods {
-			if strings.Contains(pod.Name, "0") {
-				leader = &pod
+		for i := range pods {
+			if strings.HasSuffix(pods[i].Name, "-0") {
+				return &pods[i], nil
 			}
 		}
 
-		if leader == nil {
-			return nil, fmt.Errorf("could not determine Vault leader pod. Unfamiliar naming scheme. " +
-				"None of your Vault Pod names contain a zero")
-		}
-
-		return leader, nil
+		return nil, fmt.Errorf("could not determine Vault leader pod. Unfamiliar naming scheme. " +
+			"None of your Vault Pod names end in the StatefulSet ordinal '-0'")
 	}
 
-	return &pods[0], nil
+	return &activePods[0], nil
 }
 
 // EnsureNamespace ensures we only find and use Vault Pods within a single namespace
 func EnsureNamespace(pods []corev1.Pod) (string, error) {
+	if len(pods) == 0 {
+		return "", fmt.Errorf("no Vault pods found")
+	}
+
 	var ns []string
 	for _, pod := range pods {
 		ns = append(ns, pod.Namespace)
@@ -231,42 +216,43 @@ func EnsureNamespace(pods []corev1.Pod) (string, error) {
 		return "", fmt.Errorf("discovered Vault pods in multiple namespaces: %v! Please set the namespace option", rns)
 	}
 
-	return ns[0], nil
+	return rns[0], nil
 }
 
-func WaitUntilRunning(a *app.State, pod corev1.Pod) {
+// WaitUntilRunning blocks until the given Pod's current status (re-fetched from the cluster on
+// every iteration) reports as Running.
+func WaitUntilRunning(a *app.State, pod corev1.Pod) error {
 	for {
-		if pod.Status.Phase != corev1.PodRunning {
-			a.Log.Infof("main vault Pod: %s is not running yet - waiting for Pod to start", pod.Name)
-			time.Sleep(2500 * time.Millisecond)
-		} else {
-			a.Log.Infof("main vault Pod: %s is running", pod.Name)
-			break
+		current, err := a.Kube.Pods(pod.Namespace, metav1.ListOptions{
+			FieldSelector: fmt.Sprintf("metadata.name=%s", pod.Name),
+		})
+		if err != nil {
+			return err
 		}
+
+		if len(current) == 0 {
+			return fmt.Errorf("pod %s no longer exists in namespace %s", pod.Name, pod.Namespace)
+		}
+
+		if current[0].Status.Phase == corev1.PodRunning {
+			a.Log.Infof("Vault Pod: %s is running", pod.Name)
+			return nil
+		}
+
+		a.Log.Infof("Vault Pod: %s is not running yet - waiting for Pod to start", pod.Name)
+		time.Sleep(2500 * time.Millisecond)
 	}
 }
 
+// HasKvV2Secret reports whether a KV-v2 secret exists at path, mounted at mountPath
 func HasKvV2Secret(a *app.State, path, mountPath string) bool {
-	var exists bool
-	_, err := a.VaultClient.Secrets.KvV2Read(context.Background(), path, vault.WithMountPath(mountPath))
-	if err != nil {
-		// mitigate empty result
-		if !strings.Contains(err.Error(), "404 Not Found") {
-			exists = true
-		}
-	}
-
-	return exists
+	_, err := a.Vault.KvV2Read(context.Background(), mountPath, path)
+	return err == nil
 }
 
-func WriteKvV2Secret(a *app.State, path, mountPath string, data schema.KvV2WriteRequest) error {
-	// write
-	_, err := a.VaultClient.Secrets.KvV2Write(context.Background(), path, data, vault.WithMountPath(mountPath))
-	if err != nil {
-		return err
-	}
-
-	return nil
+// WriteKvV2Secret writes (or overwrites) a KV-v2 secret at path, mounted at mountPath
+func WriteKvV2Secret(a *app.State, path, mountPath string, data map[string]interface{}) error {
+	return a.Vault.KvV2Write(context.Background(), mountPath, path, data)
 }
 
 // Policies

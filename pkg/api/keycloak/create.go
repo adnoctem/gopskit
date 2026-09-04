@@ -9,11 +9,11 @@ import (
 func (kc *Client) CreateRealm(realm *gocloak.RealmRepresentation) error {
 	_, err := kc.api.CreateRealm(context.Background(), kc.auth.JWT.AccessToken, *realm)
 	if err != nil {
-		handled := kc.handleAuthorizationError(err)
-		if handled != nil {
+		if handled := kc.handleAuthorizationError(err); handled != nil {
 			return handled
 		}
 
+		_, err = kc.api.CreateRealm(context.Background(), kc.auth.JWT.AccessToken, *realm)
 		return err
 	}
 
@@ -23,11 +23,11 @@ func (kc *Client) CreateRealm(realm *gocloak.RealmRepresentation) error {
 func (kc *Client) CreateGroup(group gocloak.Group) error {
 	_, err := kc.api.CreateGroup(context.Background(), kc.auth.JWT.AccessToken, kc.realm, group)
 	if err != nil {
-		handled := kc.handleAuthorizationError(err)
-		if handled != nil {
+		if handled := kc.handleAuthorizationError(err); handled != nil {
 			return handled
 		}
 
+		_, err = kc.api.CreateGroup(context.Background(), kc.auth.JWT.AccessToken, kc.realm, group)
 		return err
 	}
 
@@ -37,11 +37,11 @@ func (kc *Client) CreateGroup(group gocloak.Group) error {
 func (kc *Client) CreateClient(client gocloak.Client) error {
 	_, err := kc.api.CreateClient(context.Background(), kc.auth.JWT.AccessToken, kc.realm, client)
 	if err != nil {
-		handled := kc.handleAuthorizationError(err)
-		if handled != nil {
+		if handled := kc.handleAuthorizationError(err); handled != nil {
 			return handled
 		}
 
+		_, err = kc.api.CreateClient(context.Background(), kc.auth.JWT.AccessToken, kc.realm, client)
 		return err
 	}
 

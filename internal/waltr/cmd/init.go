@@ -2,12 +2,11 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/fmjstudios/gopskit/internal/waltr/app"
 	cmdutil "github.com/fmjstudios/gopskit/internal/waltr/util"
+	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
 	"github.com/fmjstudios/gopskit/pkg/core"
 	"github.com/fmjstudios/gopskit/pkg/proc"
 	"github.com/fmjstudios/gopskit/pkg/tools"
@@ -47,7 +46,7 @@ func NewInitCommand(app *app.State) *cobra.Command {
 			var needsUnseal, hasCustomConfig bool
 			var vaultNamespace, customConfigName string
 			var vaultLeaderPod *corev1.Pod
-			var creds *cmdutil.Credentials
+			var creds *apivault.Credentials
 
 			// we unseal by default
 			needsUnseal = true
@@ -75,7 +74,9 @@ func NewInitCommand(app *app.State) *cobra.Command {
 				}
 
 				// pod has to run first
-				cmdutil.WaitUntilRunning(app, p)
+				if err := cmdutil.WaitUntilRunning(app, p); err != nil {
+					return err
+				}
 				if err := cmdutil.DisableAshHistory(app, p); err != nil {
 					app.Log.Errorf("could not disable Ash Shell history for Pod: %s. Error: %v", p.Name, err)
 				}
@@ -130,28 +131,34 @@ func NewInitCommand(app *app.State) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cmdutil.WaitUntilRunning(app, *vaultLeaderPod)
+			if err := cmdutil.WaitUntilRunning(app, *vaultLeaderPod); err != nil {
+				return err
+			}
 
 			// port-forward the (leader)
 			app.Log.Infof("Port-forwarding Vault Leader: %s", vaultLeaderPod.Name)
 			ctx, cancel := context.WithCancel(context.Background())
-			go func() {
-				err := app.Kube.PortForward(ctx, *vaultLeaderPod)
+			readyChan := make(chan struct{})
+			go func(rc chan struct{}) {
+				err := app.Kube.PortForward(ctx, *vaultLeaderPod, rc)
 				if err != nil {
 					panic(err)
 				}
-			}()
+			}(readyChan)
+
+			app.Log.Info("Waiting for port-forwarded Vault API to become available...")
+			<-readyChan
 
 			// get current status
-			status, err := app.VaultClient.System.SealStatus(context.Background())
+			status, err := app.Vault.SealStatus(context.Background())
 			if err != nil {
-				app.Log.Errorf("could not get Vault status: %v", err)
+				cancel()
+				return fmt.Errorf("could not get Vault status: %v", err)
 			}
 
 			// check for initialization
-			if !status.Data.Initialized {
-				var req schema.InitializeRequest
-				req = schema.InitializeRequest{
+			if !status.Initialized {
+				req := schema.InitializeRequest{
 					SecretShares:    int32(shares),
 					SecretThreshold: int32(threshold),
 				}
@@ -164,36 +171,26 @@ func NewInitCommand(app *app.State) *cobra.Command {
 					}
 				}
 
-				initRes, err := app.VaultClient.System.Initialize(context.Background(), req)
+				initRes, err := app.Vault.Initialize(context.Background(), req)
 				if err != nil {
-					defer cancel()
+					cancel()
 					return fmt.Errorf("could not initialize Vault instance: %v", err)
 				}
 
 				app.Log.Infof("successfully initialized Vault instance: %s", vaultLeaderPod.Name)
 
-				var data initResponse
-				jsn, err := json.MarshalIndent(initRes, "", "")
-				if err != nil {
-					app.Log.Errorf("could not marshal init request: %v. Vault returned invalid response.", err)
-				}
-				if err := json.Unmarshal(jsn, &data); err != nil {
-					app.Log.Errorf("could not unmarshal init response: %v. Vault returned invalid response.",
-						err)
-				}
-
 				// determine Vault credentials
-				creds = &cmdutil.Credentials{
-					Keys:       data.Data.Keys,
-					KeysBase64: data.Data.KeysBase64,
-					Token:      data.Data.RootToken,
+				creds = &apivault.Credentials{
+					Keys:    initRes.Keys,
+					KeysB64: initRes.KeysB64,
+					Token:   initRes.RootToken,
 				}
 
 				// write Token somewhere where we can retrieve it
 				if secretFile != "" {
 					_, err := tools.AddSecretValue(secretFile, map[string]interface{}{
 						"vault": map[string]interface{}{
-							"token": data.Data.RootToken,
+							"token": initRes.RootToken,
 						},
 					}, false)
 
@@ -204,49 +201,10 @@ func NewInitCommand(app *app.State) *cobra.Command {
 					app.Log.Info("secret-file unset. only writing Vault Token to cache path!")
 				}
 
-				// write to filesystem
-				// if credentialFile == "" {
-				// 	credentialFile = filepath.Join(app.Paths.Data, "credentials", "vault-credentials.json")
-				// }
-
-				// file, err := os.Open(credentialFile)
-				// if err != nil {
-				// 	app.Log.Error("could not open Vault credential file path: %s", err)
-				// 	app.Log.Debug("printing Vault credentials to prevent loss!")
-				// 	fmt.Printf(`
-				// 	Vault Token: %s
-				// 	Vault Unseal Keys: [%s]
-				// 	`, data.Data.RootToken, strings.Join(data.Data.Keys, ","))
-				// }
-
-				// json, err := json.Marshal(data)
-				// if err != nil {
-				// 	app.Log.Error("could not open marshal Vault data to JSON: %s", err)
-				// 	app.Log.Debug("printing Vault credentials to prevent loss!")
-				// 	fmt.Printf(`
-				// 	Vault Token: %s
-				// 	Vault Unseal Keys: [%s]
-				// 	`, data.Data.RootToken, strings.Join(data.Data.Keys, ","))
-				// }
-
-				// err = fs.WriteFile(file, json)
-
-				// err = app.KV.Set("token", []byte(data.Data.RootToken))
-				// if err != nil {
-				// 	defer cancel()
-				// 	return err
-				// }
-
-				// err = app.KV.Set("unseal-keys", []byte(strings.Join(data.Data.Keys, ",")))
-				// if err != nil {
-				// 	defer cancel()
-				// 	return err
-				// }
-
 				// always write backup json file to cache path
 				err = cmdutil.WriteCredentials(app, environment, creds)
 				if err != nil {
-					defer cancel()
+					cancel()
 					return err
 				}
 			} else {
@@ -256,7 +214,7 @@ func NewInitCommand(app *app.State) *cobra.Command {
 			cancel()
 
 			// re-read credentials if we skipped initialization
-			if status.Data.Initialized {
+			if status.Initialized {
 				creds, err = cmdutil.ReadCredentials(app, environment)
 				if err != nil {
 					return fmt.Errorf("could not read Vault credentials: %v. Did you initialize Vault with 'waltr'",
@@ -264,66 +222,54 @@ func NewInitCommand(app *app.State) *cobra.Command {
 				}
 			}
 
-			if err := app.VaultClient.SetToken(creds.Token); err != nil {
+			if err := app.Vault.SetToken(creds); err != nil {
 				return fmt.Errorf("could not set Vault token: %v", err)
 			}
 
 			// unseal the pod(s) - if auto-unseal is not enabled or if we're not initialized yet
-			if needsUnseal || !status.Data.Initialized {
+			if needsUnseal || !status.Initialized {
 				for _, p := range pods {
 					err := func() error {
-						// wait for boot-up
-						for {
-							if p.Status.Phase != corev1.PodRunning {
-								app.Log.Infof("Vault Pod: %s is not running yet - waiting for Pod to start", p.Name)
-								time.Sleep(2500 * time.Millisecond)
-							} else {
-								app.Log.Infof("Vault Pod: %s is running", p.Name)
-								break
-							}
+						if err := cmdutil.WaitUntilRunning(app, p); err != nil {
+							return err
 						}
 
 						ctx, loopCancel := context.WithCancel(context.Background())
+						defer loopCancel()
+
 						app.Log.Infof("starting Vault port-forward for pod: %s", p.Name)
-						go func() {
-							err := app.Kube.PortForward(ctx, p)
+						readyChan := make(chan struct{})
+						go func(rc chan struct{}) {
+							err := app.Kube.PortForward(ctx, p, rc)
 							if err != nil {
 								panic(err)
 							}
-						}()
+						}(readyChan)
 
-						app.Log.Info("waiting for API's to boot...")
-						time.Sleep(time.Millisecond * 2000)
+						app.Log.Info("waiting for port-forwarded Vault API to become available...")
+						<-readyChan
 
 						// unseal
 						for i := 0; i < threshold; i++ {
-							sealed, err := app.VaultClient.System.SealStatus(context.Background())
+							sealed, err := app.Vault.SealStatus(context.Background())
 							if err != nil {
-								loopCancel()
 								return fmt.Errorf("could not get Vault status: %v", err)
 							}
 
-							if !sealed.Data.Sealed {
+							if !sealed.Sealed {
 								app.Log.Infof("skipping Vault unseal iteration: %d - Vault is unsealed", i)
 								continue
 							}
 
-							_, err = app.VaultClient.System.Unseal(context.Background(), schema.UnsealRequest{
-								Key:   creds.Keys[i],
-								Reset: false,
-							})
-
+							_, err = app.Vault.Unseal(context.Background(), creds.Keys[i])
 							if err != nil {
-								loopCancel()
 								return fmt.Errorf("could not unseal Vault instance: %s", p.Name)
 							}
 
 							app.Log.Infof("successfully unsealed Vault instance: %s with key %d of threshold %d",
 								p.Name, i+1, threshold)
-							time.Sleep(time.Millisecond * 250)
 						}
 
-						loopCancel()
 						return nil
 					}()
 
@@ -348,18 +294,4 @@ func NewInitCommand(app *app.State) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&credentialFile, "credential-file", "", "A custom filepath to store Vault credentials obtained via initialization")
 
 	return cmd
-}
-
-// vault initialization output
-type initResponse struct {
-	RequestID     string `json:"request_id"`
-	LeaseID       string `json:"lease_id"`
-	LeaseDuration int    `json:"lease_duration"`
-	Renewable     bool   `json:"renewable"`
-	Data          struct {
-		Keys       []string `json:"keys"`
-		KeysBase64 []string `json:"keys_base64"`
-		RootToken  string   `json:"root_token"`
-	} `json:"data"`
-	Warnings any `json:"warnings"`
 }

@@ -62,14 +62,14 @@ type Logger struct {
 	*zap.SugaredLogger
 }
 
-// Config builds a new zap.Config with optional Options for configuration
-func Config(opts ...zap.Option) *zap.Config {
+// Config builds a new, validated zap.Config using the DefaultConfig as its base
+func Config() *zap.Config {
 	c := DefaultConfig
 	g := new(errgroup.Group)
 
 	// assert that it builds
 	g.Go(func() error {
-		_, err := c.Build(opts...)
+		_, err := c.Build()
 		if err != nil {
 			return err
 		}
@@ -112,6 +112,7 @@ func New(opts ...Option) *Logger {
 	lgr, err := l.conf.Build()
 	if err != nil {
 		fmt.Printf("could not build Config for Logger: %v", err)
+		os.Exit(1)
 	}
 
 	return &Logger{

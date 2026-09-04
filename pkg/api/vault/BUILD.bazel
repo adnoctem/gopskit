@@ -2,14 +2,20 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "vault",
-    srcs = ["vault.go"],
+    srcs = [
+        "auth.go",
+        "secrets.go",
+        "system.go",
+        "vault.go",
+    ],
     importpath = "github.com/fmjstudios/gopskit/pkg/api/vault",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api",
         "//pkg/fsi",
-        "@com_github_hashicorp_hcl_v2//:hcl",
+        "//pkg/log",
         "@com_github_hashicorp_vault_client_go//:vault-client-go",
+        "@com_github_hashicorp_vault_client_go//schema",
     ],
 )
 

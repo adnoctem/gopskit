@@ -7,10 +7,7 @@ import (
 func (kc *Client) RealmExists(name string) (bool, error) {
 	realms, err := kc.Realms()
 	if err != nil {
-		handled := kc.handleAuthorizationError(err)
-		if handled != nil {
-			return true, handled
-		}
+		return false, err
 	}
 
 	for _, v := range realms {
@@ -26,12 +23,8 @@ func (kc *Client) GroupExists(name string) (bool, error) {
 	groups, err := kc.Groups(gocloak.GetGroupsParams{
 		Search: &name,
 	})
-
 	if err != nil {
-		handled := kc.handleAuthorizationError(err)
-		if handled != nil {
-			return true, handled
-		}
+		return false, err
 	}
 
 	for _, v := range groups {
@@ -48,12 +41,8 @@ func (kc *Client) ClientExists(clientId string) (bool, error) {
 		ClientID: &clientId,
 		Search:   gocloak.BoolP(true),
 	})
-
 	if err != nil {
-		handled := kc.handleAuthorizationError(err)
-		if handled != nil {
-			return true, handled
-		}
+		return false, err
 	}
 
 	for _, v := range clients {

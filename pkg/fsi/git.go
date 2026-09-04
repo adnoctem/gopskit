@@ -21,31 +21,32 @@ var (
 func ParseGitRoot(path string) (string, error) {
 	path, err := filepath.Abs(path)
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	for {
 		gitDir := filepath.Join(path, KnownGitDir)
 		info, err := os.Stat(gitDir)
-		if err != nil {
+		switch {
+		case err == nil:
+			if !info.IsDir() {
+				return "", fmt.Errorf("%s exists but points to a file, rather than a directory", gitDir)
+			}
+
+			ok, err := findGitMarkers(gitDir)
+			if err != nil {
+				return "", err
+			}
+
+			if ok {
+				return filepath.Dir(gitDir), nil
+			}
+		case !errors.Is(err, os.ErrNotExist):
 			return "", err
 		}
 
-		if !info.IsDir() {
-			return "", fmt.Errorf("%s exists but points to a file, rather than a directory", path)
-		}
-
-		ok, err := findGitMarkers(gitDir)
-		if err != nil {
-			return "", err
-		}
-
-		if info.IsDir() && ok {
-			return filepath.Dir(gitDir), nil
-		}
-
-		// check if were in a bare repository
-		ok, err = findGitMarkers(path)
+		// check if we're in a bare repository
+		ok, err := findGitMarkers(path)
 		if err != nil {
 			return "", err
 		}
@@ -59,7 +60,7 @@ func ParseGitRoot(path string) (string, error) {
 			return "", fmt.Errorf("cannot find .git in or below path: %s", path)
 		}
 
-		// reset path before new loop iter
+		// walk up to the parent directory before the next iteration
 		path = parentDir
 	}
 }
@@ -73,12 +74,10 @@ func findGitMarkers(path string) (bool, error) {
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				return false, err
-			} else {
-				return false, nil
 			}
-		}
 
-		continue
+			return false, nil
+		}
 	}
 
 	return true, nil

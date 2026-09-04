@@ -43,6 +43,4 @@ type VaultClient interface {
 
 	// Valid denotes whether or not the current credentials are valid
 	Valid() bool
-
-	//
 }

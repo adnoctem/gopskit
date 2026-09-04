@@ -26,27 +26,42 @@ func (c *Client) Apply(schema schema.GroupVersionResource, resource *unstructure
 		return err
 	}
 
-	result, err = dc.Resource(schema).Get(context.Background(), opts.Name, *opts.GetOptions)
+	getOpts := metav1.GetOptions{}
+	if opts.GetOptions != nil {
+		getOpts = *opts.GetOptions
+	}
+
+	createOpts := metav1.CreateOptions{}
+	if opts.CreateOptions != nil {
+		createOpts = *opts.CreateOptions
+	}
+
+	updateOpts := metav1.UpdateOptions{}
+	if opts.UpdateOptions != nil {
+		updateOpts = *opts.UpdateOptions
+	}
+
+	result, err = dc.Resource(schema).Get(context.Background(), opts.Name, getOpts)
 	if err != nil {
 		return err
 	}
 
 	exists := result.Object["metadata"] != nil
 	if !exists {
-		result, err = dc.Resource(schema).Create(context.Background(), resource, *opts.CreateOptions)
+		result, err = dc.Resource(schema).Create(context.Background(), resource, createOpts)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf(`Created Kubernetes Resource: %v named %v\n`, result.GetKind(), result.GetName())
+		fmt.Printf("Created Kubernetes Resource: %v named %v\n", result.GetKind(), result.GetName())
 		return nil
 	}
 
-	result, err = dc.Resource(schema).Update(context.Background(), resource, *opts.UpdateOptions)
+	result, err = dc.Resource(schema).Update(context.Background(), resource, updateOpts)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf(`Updated Kubernetes Resource: %v named %v\n`, result.GetKind(), result.GetName())
+	fmt.Printf("Updated Kubernetes Resource: %v named %v\n", result.GetKind(), result.GetName())
 	return nil
 }

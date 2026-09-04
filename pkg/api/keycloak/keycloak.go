@@ -94,7 +94,8 @@ func (a *Auth) Load() error {
 		return err
 	}
 
-	a = &creds
+	creds.path = a.path
+	*a = creds
 	return nil
 }
 
@@ -416,22 +417,25 @@ func (kc *Client) applyTLSConfig() {
 	kc.api.RestyClient().SetTLSClientConfig(kc.tls)
 }
 
+// handleAuthorizationError attempts to recover from a 401 response by reloading persisted
+// credentials and refreshing the access token if it has expired. It returns nil if recovery
+// succeeded and the caller should retry its original request exactly once, or a non-nil error
+// if recovery wasn't possible. It deliberately never dispatches another authenticated API
+// request itself (e.g. via kc.Realms()) - doing so would re-enter this handler on a persistently
+// invalid token and recurse indefinitely.
 func (kc *Client) handleAuthorizationError(err error) error {
-	if kc.isUnauthorizedErr(err) {
-		if err := kc.auth.Load(); err != nil {
-			return err
-		}
-		if kc.hasTokenExpired() {
-			kc.Refresh()
-		}
+	if !kc.isUnauthorizedErr(err) {
+		return err
 	}
 
-	_, err = kc.Realms()
-	if err != nil {
-		if kc.isUnauthorizedErr(err) {
+	if err := kc.auth.Load(); err != nil {
+		return err
+	}
+
+	if kc.hasTokenExpired() {
+		if err := kc.Refresh(); err != nil {
 			return ErrAuthExpired
 		}
-		return err
 	}
 
 	return nil

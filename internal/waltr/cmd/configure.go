@@ -6,10 +6,10 @@ import (
 
 	"github.com/fmjstudios/gopskit/internal/waltr/app"
 	"github.com/fmjstudios/gopskit/internal/waltr/util"
+	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
 	"github.com/fmjstudios/gopskit/pkg/core"
 	"github.com/fmjstudios/gopskit/pkg/helpers"
 	"github.com/fmjstudios/gopskit/pkg/proc"
-	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/spf13/cobra"
 )
 
@@ -52,16 +52,17 @@ func NewConfigureCommand(app *app.State) *cobra.Command {
 			app.Log.Infof("Port-forwarding Vault instance: %s", pods[0].Name)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			go func() {
-				err := app.Kube.PortForward(ctx, pods[0])
+			readyChan := make(chan struct{})
+			go func(rc chan struct{}) {
+				err := app.Kube.PortForward(ctx, pods[0], rc)
 				if err != nil {
 					panic(err)
 				}
-			}()
+			}(readyChan)
+			<-readyChan
 
 			// add token
-			err = app.VaultClient.SetToken(token)
-			if err != nil {
+			if err := app.Vault.SetToken(&apivault.Credentials{Token: token}); err != nil {
 				return fmt.Errorf("could not set token: %v", err)
 			}
 
@@ -80,9 +81,7 @@ func NewConfigureCommand(app *app.State) *cobra.Command {
 			// current policies for Helm releases
 			for _, v := range util.Releases {
 				if !helpers.SliceContains(pol, v) || overwrite {
-					_, err := app.VaultClient.System.PoliciesWriteAclPolicy(context.Background(), v, schema.PoliciesWriteAclPolicyRequest{
-						Policy: fmt.Sprintf(util.ConfigReleasePolicyTemplate, v),
-					})
+					err := app.Vault.PoliciesWriteAclPolicy(context.Background(), v, fmt.Sprintf(util.ConfigReleasePolicyTemplate, v))
 					if err != nil {
 						return err
 					}
@@ -96,10 +95,7 @@ func NewConfigureCommand(app *app.State) *cobra.Command {
 			// configure Vault policies to use for authenticated users
 			for k, v := range util.ConfigAclPolicies {
 				if !helpers.SliceContains(pol, k) {
-					_, err := app.VaultClient.System.PoliciesWriteAclPolicy(context.Background(), k,
-						schema.PoliciesWriteAclPolicyRequest{
-							Policy: v,
-						})
+					err := app.Vault.PoliciesWriteAclPolicy(context.Background(), k, v)
 					if err != nil {
 						return err
 					}
@@ -113,10 +109,7 @@ func NewConfigureCommand(app *app.State) *cobra.Command {
 			// configure Vault password policies to generate secure secrets later on
 			for k, v := range util.ConfigPasswordPolicies {
 				if !helpers.SliceContains(ppol, k) {
-					_, err := app.VaultClient.System.PoliciesWritePasswordPolicy(context.Background(), k,
-						schema.PoliciesWritePasswordPolicyRequest{
-							Policy: v,
-						})
+					err := app.Vault.PoliciesWritePasswordPolicy(context.Background(), k, v)
 					if err != nil {
 						return err
 					}

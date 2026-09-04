@@ -300,7 +300,6 @@ func GetSecretValue(path, jsonPath string, unencrypted bool) (string, error) {
 	}
 
 	state, err := GetFileState(path)
-	fmt.Printf("GetSecretValue file state is: %s\n", state)
 	if err != nil {
 		return "", err
 	}

@@ -110,17 +110,14 @@ func ReplaceRecursive(input map[string]interface{}, keys []string, output map[st
 }
 
 func SanitizeSlice(slice []string) []string {
-	var copy = slice
-	for i, v := range slice {
-		if v == "" {
-			remove(copy, i)
+	result := make([]string, 0, len(slice))
+	for _, v := range slice {
+		if v != "" {
+			result = append(result, v)
 		}
 	}
-	return copy
-}
 
-func remove(slice []string, i int) []string {
-	return append(slice[:i], slice[i+1:]...)
+	return result
 }
 
 func CopyMap(m map[string]interface{}) map[string]interface{} {

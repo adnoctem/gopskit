@@ -86,7 +86,10 @@ func latestGitHubRelease(client *resty.Client, url string) (*releaseResponse, er
 	}
 
 	d := &releaseResponse{}
-	json.Unmarshal(resp.Body(), d)
+	if err := json.Unmarshal(resp.Body(), d); err != nil {
+		return nil, err
+	}
+
 	return d, nil
 }
 
@@ -107,7 +110,7 @@ func parseGitHubURL(url string) (string, string, error) {
 
 // Trim the v from the GitHub Tag
 func versionFromTag(tag string) string {
-	return strings.TrimPrefix("v", tag)
+	return strings.TrimPrefix(tag, "v")
 }
 
 // Add a 'v' to a SemVer version if needed

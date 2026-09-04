@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 )
 
 // Opt is a configuration option for the initialization of new Executor's
@@ -77,22 +78,39 @@ func WithInheritedEnv() Opt {
 	}
 }
 
-// WithMultiWriters configures the Execute function to use a MultiWriter during execution to
-// simultaneously write to both the system's StdOut/Err and to a provided byte-buffer for
-// each of those descriptors
-func WithMultiWriters(writers ...bytes.Buffer) ExecuteOpt {
+// WithMultiWriters configures the Execute function to simultaneously write to both the system's
+// StdOut/Err and to the given byte-buffers, in order (StdOut first, StdErr second). Buffers must
+// be passed by pointer so the caller can read them back after Execute returns.
+func WithMultiWriters(writers ...*bytes.Buffer) ExecuteOpt {
 	return func(e *Executor) {
-		e.writers = append(e.writers, io.MultiWriter(os.Stdout, &writers[0]))
-		e.writers = append(e.writers, io.MultiWriter(os.Stderr, &writers[1]))
+		var stdout, stderr io.Writer = os.Stdout, os.Stderr
+
+		if len(writers) > 0 && writers[0] != nil {
+			stdout = io.MultiWriter(os.Stdout, writers[0])
+		}
+		if len(writers) > 1 && writers[1] != nil {
+			stderr = io.MultiWriter(os.Stderr, writers[1])
+		}
+
+		e.writers = append(e.writers, stdout, stderr)
 	}
 }
 
-// WithWriters configures the Execute function to spawn a GoRoutine which fills
-// a slice of byte-buffers with date from the StdOut and StdErr output respectively.
-func WithWriters(writers ...bytes.Buffer) ExecuteOpt {
+// WithWriters configures the Execute function to fill the given byte-buffers with the StdOut and
+// StdErr output respectively, in order. Buffers must be passed by pointer so the caller can read
+// them back after Execute returns.
+func WithWriters(writers ...*bytes.Buffer) ExecuteOpt {
 	return func(e *Executor) {
-		var bufStdO, bufStdE bytes.Buffer
-		e.writers = append(e.writers, &bufStdO, &bufStdE)
+		var stdout, stderr io.Writer
+
+		if len(writers) > 0 {
+			stdout = writers[0]
+		}
+		if len(writers) > 1 {
+			stderr = writers[1]
+		}
+
+		e.writers = append(e.writers, stdout, stderr)
 	}
 }
 
@@ -113,13 +131,11 @@ func (e *Executor) Execute(args []string, opts ...ExecuteOpt) ([]string, error) 
 	ctx, ctxCancel := context.WithCancel(context.TODO())
 	defer ctxCancel()
 
-	//args := strings.Fields(command)
 	e.Cmd = exec.CommandContext(ctx, args[0], args[1:]...)
 
 	// sanity
-	bin, err := LookPath(args[0])
-	if err != nil {
-		return nil, NotInPathError{Executable: bin}
+	if _, err := LookPath(args[0]); err != nil {
+		return nil, NotInPathError{Executable: args[0]}
 	}
 
 	// update values for each call
@@ -136,44 +152,50 @@ func (e *Executor) Execute(args []string, opts ...ExecuteOpt) ([]string, error) 
 	readers := []io.ReadCloser{Must(e.StdoutPipe()), Must(e.StderrPipe())}
 
 	// execute command
-	err = e.Start()
-	if err != nil {
+	if err := e.Start(); err != nil {
 		return nil, err
 	}
 
-	// copy command output to generic io.Writers (if set)
+	// Each pipe is a one-shot stream, so it must be read exactly once. We capture stdout/stderr
+	// into their own buffers (fanning out to any configured e.writers along the way) concurrently,
+	// since sequentially draining stdout then stderr risks a deadlock if the process fills the
+	// unread pipe's OS buffer while we're still blocked reading the other one.
+	var stdoutBuf, stderrBuf bytes.Buffer
+	dst := []io.Writer{&stdoutBuf, &stderrBuf}
 	for i, wr := range e.writers {
-		if _, err := copyBytes(readers[i], wr); err != nil {
+		if wr != nil {
+			dst[i] = io.MultiWriter(dst[i], wr)
+		}
+	}
+
+	var wg sync.WaitGroup
+	copyErrs := make([]error, 2)
+	wg.Add(2)
+	for i := range readers {
+		go func(i int) {
+			defer wg.Done()
+			_, copyErrs[i] = copyBytes(readers[i], dst[i])
+		}(i)
+	}
+	wg.Wait()
+
+	for _, err := range copyErrs {
+		if err != nil {
 			return nil, err
 		}
 	}
 
-	// write output to files (if set)
+	// write stdout to files (if set)
 	for _, out := range e.outputs {
-		var buf bytes.Buffer
-		if _, err := copyBytes(readers[0], &buf); err != nil {
-			return nil, err
-		}
-
-		if err := os.WriteFile(out, buf.Bytes(), 0644); err != nil {
+		if err := os.WriteFile(out, stdoutBuf.Bytes(), 0644); err != nil {
 			return nil, err
 		}
 	}
 
-	var output = make([]string, 2)
-	// we only need stdout and stderr
-	for i := 0; i <= 1; i++ {
-		var buf bytes.Buffer
-		if _, err := copyBytes(readers[i], &buf); err != nil {
-			return nil, err
-		}
-
-		output[i] = buf.String()
-	}
+	output := []string{stdoutBuf.String(), stderrBuf.String()}
 
 	// wait for command to finish
-	err = e.Wait()
-	if err != nil {
+	if err := e.Wait(); err != nil {
 		return nil, ExecuteError{ExitCode: e.ProcessState.ExitCode(), Err: err}
 	}
 

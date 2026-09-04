@@ -10,12 +10,10 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/waltr/app",
+        "//pkg/api/vault",
         "//pkg/core",
-        "//pkg/fsi",
         "//pkg/helpers",
         "@com_github_hashicorp_hcl_v2//:hcl",
-        "@com_github_hashicorp_vault_client_go//:vault-client-go",
-        "@com_github_hashicorp_vault_client_go//schema",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
     ],
