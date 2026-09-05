@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "crypto.go",
         "merge.go",
+        "pointers.go",
         "primitives.go",
         "slices.go",
     ],

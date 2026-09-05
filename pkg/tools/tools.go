@@ -18,11 +18,11 @@ import (
 type Executable int
 
 const (
-	kubectl Executable = iota
-	helm
-	helmfile
-	stepCA
-	kustomize
+	Kubectl Executable = iota
+	Helm
+	Helmfile
+	StepCA
+	Kustomize
 )
 
 // String implements the fmt.Stringer interface for the new Executable type
@@ -37,7 +37,7 @@ func (e Executable) Index() int {
 
 var (
 	githubURL   = "https://github.com/"
-	executables = []Executable{kubectl, helm, helmfile, stepCA, kustomize}
+	executables = []Executable{Kubectl, Helm, Helmfile, StepCA, Kustomize}
 )
 
 // Find checks the system for the required executables. It returns the first error that occurs during
@@ -86,7 +86,10 @@ func latestGitHubRelease(client *resty.Client, url string) (*releaseResponse, er
 	}
 
 	d := &releaseResponse{}
-	json.Unmarshal(resp.Body(), d)
+	if err := json.Unmarshal(resp.Body(), d); err != nil {
+		return nil, err
+	}
+
 	return d, nil
 }
 
@@ -107,7 +110,7 @@ func parseGitHubURL(url string) (string, string, error) {
 
 // Trim the v from the GitHub Tag
 func versionFromTag(tag string) string {
-	return strings.TrimPrefix("v", tag)
+	return strings.TrimPrefix(tag, "v")
 }
 
 // Add a 'v' to a SemVer version if needed

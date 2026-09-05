@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/fmjstudios/gopskit/internal/fillr/app"
 	fs "github.com/fmjstudios/gopskit/pkg/fsi"
@@ -96,18 +95,12 @@ fillr my-values.yaml -t "{{ index .Values \"kubescape-operator\" \"chartValues\"
 	}
 
 	cmd.PersistentFlags().StringVarP(&output, "output", "o", "", "The file path to output fillr's result to")
-	cmd.PersistentFlags().StringVarP(&template, "template", "t", helpers.REPLACE_TEMPLATE, "The template to use for each YAML key")
+	cmd.PersistentFlags().StringVarP(&template, "template", "t", helpers.ReplaceTemplate, "The template to use for each YAML key")
 
 	// add subcommands
-	var wg sync.WaitGroup
-	wg.Add(len(Commands))
 	for _, opt := range Commands {
-		go func() {
-			cmd.AddCommand(opt()(fillr))
-			wg.Done()
-		}()
+		cmd.AddCommand(opt(fillr))
 	}
-	wg.Wait()
 
 	return cmd
 }

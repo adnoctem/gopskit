@@ -12,14 +12,18 @@ func OnlyLetters(s string) bool {
 	return true
 }
 
-func StrPtr(s string) *string {
-	return &s
+func NotEmptyString(s string) bool {
+	return s != ""
 }
 
-func BoolPtr(b bool) *bool {
-	return &b
+func NotEmptyStrings(s, t string) bool {
+	return s != "" && t != ""
 }
 
-func Int(i int) *int {
-	return &i
+func EmptyString(s string) bool {
+	return s == ""
+}
+
+func EmptyStrings(s, t string) bool {
+	return s == "" && t == ""
 }

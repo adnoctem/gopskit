@@ -6,13 +6,13 @@ go_library(
     importpath = "github.com/fmjstudios/gopskit/internal/waltr/app",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//pkg/api/vault",
         "//pkg/core",
         "//pkg/fsi",
         "//pkg/kube",
         "//pkg/log",
         "//pkg/proc",
         "//pkg/stamp",
-        "@com_github_hashicorp_vault_client_go//:vault-client-go",
         "@com_github_spf13_cobra//:cobra",
     ],
 )

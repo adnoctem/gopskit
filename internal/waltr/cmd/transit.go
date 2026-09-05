@@ -7,6 +7,7 @@ import (
 
 	"github.com/fmjstudios/gopskit/internal/waltr/app"
 	"github.com/fmjstudios/gopskit/internal/waltr/util"
+	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
 	"github.com/fmjstudios/gopskit/pkg/core"
 	"github.com/fmjstudios/gopskit/pkg/helpers"
 	"github.com/fmjstudios/gopskit/pkg/proc"
@@ -53,16 +54,17 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 			app.Log.Infof("Port-forwarding Vault instance: %s", pods[0].Name)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			go func() {
-				err := app.Kube.PortForward(ctx, pods[0])
+			readyChan := make(chan struct{})
+			go func(rc chan struct{}) {
+				err := app.Kube.PortForward(ctx, pods[0], rc)
 				if err != nil {
 					panic(err)
 				}
-			}()
+			}(readyChan)
+			<-readyChan
 
 			// add token
-			err = app.VaultClient.SetToken(token)
-			if err != nil {
+			if err := app.Vault.SetToken(&apivault.Credentials{Token: token}); err != nil {
 				return fmt.Errorf("could not set token: %v", err)
 			}
 
@@ -74,7 +76,7 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 			// enable transit-encryption
 			const tep = "transit/"
 			if !helpers.SliceContains(s, tep) || overwrite {
-				_, err := app.VaultClient.System.MountsEnableSecretsEngine(context.Background(),
+				err := app.Vault.MountsEnableSecretsEngine(context.Background(),
 					strings.TrimSuffix(tep, "/"),
 					schema.MountsEnableSecretsEngineRequest{
 						Type:        "transit",
@@ -90,23 +92,23 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 				app.Log.Info("Vault secrets engine transit already enabled")
 			}
 
-			// create transit secret key (if required)
+			// create transit secret key (if required, or if overwriting)
 			const tkp = "transit/keys/vso-client-cache"
-			_, err = app.VaultClient.Read(context.Background(), tkp)
-			if err != nil {
-				// mitigate empty result
-				if strings.Contains(err.Error(), "404 Not Found") {
-					err = nil
-				} else {
-					return err
-				}
-			}
-
-			_, err = app.VaultClient.Write(context.Background(), tkp, map[string]interface{}{})
-			if err != nil {
+			_, err = app.Vault.Read(context.Background(), tkp)
+			exists := err == nil
+			if err != nil && !apivault.IsNotFound(err) {
 				return err
 			}
-			app.Log.Infof("created Vault transit encryption key: %s", tkp)
+
+			if !exists || overwrite {
+				if err := app.Vault.Write(context.Background(), tkp, map[string]interface{}{}); err != nil {
+					return err
+				}
+
+				app.Log.Infof("created Vault transit encryption key: %s", tkp)
+			} else {
+				app.Log.Infof("skipped creation of Vault transit encryption key: %s", tkp)
+			}
 
 			// create ACL policy
 			pol, err := util.Policies(app)
@@ -116,10 +118,7 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 
 			const p = "vso-auth"
 			if !helpers.SliceContains(pol, p) || overwrite {
-				_, err := app.VaultClient.System.PoliciesWriteAclPolicy(context.Background(), p,
-					schema.PoliciesWriteAclPolicyRequest{
-						Policy: fmt.Sprintf(util.ConfigReleasePolicyTemplate, p),
-					})
+				err := app.Vault.PoliciesWriteAclPolicy(context.Background(), p, fmt.Sprintf(util.ConfigReleasePolicyTemplate, p))
 				if err != nil {
 					return err
 				}
@@ -136,7 +135,7 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 			}
 
 			if !helpers.SliceContains(rola, p) || overwrite {
-				_, err := app.VaultClient.Auth.KubernetesWriteAuthRole(context.Background(), p, schema.KubernetesWriteAuthRoleRequest{
+				err := app.Vault.KubernetesWriteAuthRole(context.Background(), p, schema.KubernetesWriteAuthRoleRequest{
 					Audience:                      "vault",
 					BoundServiceAccountNames:      []string{"vault-secrets-operator"},
 					BoundServiceAccountNamespaces: []string{"vault-secrets-operator"},

@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "api",
+    srcs = [
+        "api.go",
+        "tls.go",
+    ],
+    importpath = "github.com/fmjstudios/gopskit/pkg/api",
+    visibility = ["//visibility:public"],
+    deps = ["//pkg/fsi"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":api",
+    visibility = ["//visibility:public"],
+)

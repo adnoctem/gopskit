@@ -22,3 +22,8 @@ func NewPrepareCommand(app *app.State) *cobra.Command {
 
 	return cmd
 }
+
+func addPrepareFlags(cmd *cobra.Command, overwrite *bool, token *string) {
+	cmd.PersistentFlags().BoolVar(overwrite, "overwrite", false, "Overwrite existing configuration")
+	cmd.PersistentFlags().StringVarP(token, "token", "t", "", "The Vault root token")
+}

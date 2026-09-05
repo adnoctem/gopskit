@@ -12,7 +12,6 @@ go_library(
         "//pkg/log",
         "//pkg/proc",
         "//pkg/stamp",
-        "@com_github_nerzal_gocloak_v13//:gocloak",
         "@com_github_spf13_cobra//:cobra",
     ],
 )

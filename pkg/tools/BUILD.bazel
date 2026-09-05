@@ -4,7 +4,6 @@ go_library(
     name = "tools",
     srcs = [
         "helm.go",
-        "helmfile.go",
         "smallstep.go",
         "tools.go",
     ],

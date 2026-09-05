@@ -2,8 +2,9 @@ package app
 
 import (
 	"fmt"
+	"path/filepath"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/fmjstudios/gopskit/pkg/api/keycloak"
 	"github.com/fmjstudios/gopskit/pkg/core"
 	fs "github.com/fmjstudios/gopskit/pkg/fsi"
 	"github.com/fmjstudios/gopskit/pkg/kube"
@@ -17,6 +18,7 @@ const (
 	Name             string = "ssolo"
 	DefaultLabel     string = "app=keycloak,app.kubernetes.io/instance=keycloak"
 	DefaultNamespace string = "keycloak"
+	DefaultRealmName string = "Operations"
 )
 
 var (
@@ -33,7 +35,8 @@ type State struct {
 	*core.API
 
 	// KeycloakClient is the Keycloak API client used to manage its' resources
-	KeycloakClient *gocloak.GoCloak
+	// Keycloak *gocloak.GoCloak
+	Keycloak *keycloak.Client
 }
 
 // New creates a newly initialized instance of the State type
@@ -58,7 +61,12 @@ func New(opts ...Opt) (*State, error) {
 		return nil, err
 	}
 
-	key := gocloak.NewClient(DefaultHostname)
+	kec := keycloak.New(
+		DefaultHostname,
+		keycloak.WithAuthPath(getAuthPath(platf.Cache)),
+		keycloak.WithInsecureTLS(true), // TODO(FMJdev): remove this to improve security
+		keycloak.WithRealm("master"),
+	)
 
 	kc, err := kube.NewClient()
 	if err != nil {
@@ -76,7 +84,7 @@ func New(opts ...Opt) (*State, error) {
 			Paths: platf,
 			Stamp: stamps,
 		},
-		KeycloakClient: key,
+		Keycloak: kec,
 	}
 
 	// (re-)configure if the user wants to do so
@@ -85,4 +93,8 @@ func New(opts ...Opt) (*State, error) {
 	}
 
 	return a, nil
+}
+
+func getAuthPath(baseDir string) string {
+	return filepath.Join(baseDir, "creds", "keycloak-credentials.json")
 }

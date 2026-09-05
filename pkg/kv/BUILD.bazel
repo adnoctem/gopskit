@@ -13,7 +13,6 @@ go_library(
         "//pkg/fsi",
         "//pkg/helpers",
         "@com_github_dgraph_io_badger_v4//:badger",
-        "@org_golang_x_sync//errgroup",
     ],
 )
 

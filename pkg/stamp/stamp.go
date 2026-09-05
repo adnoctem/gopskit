@@ -23,6 +23,7 @@ func New() *Stamps {
 	return &Stamps{
 		Version:   Version,
 		BuildDate: BuildDate,
+		CommitSHA: CommitSHA,
 		Branch:    Branch,
 		Platform:  Platform,
 		GoVersion: GoVersion,

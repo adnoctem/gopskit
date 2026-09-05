@@ -22,10 +22,9 @@ func Remove(path string) error {
 	}
 
 	err := os.RemoveAll(path)
-	isPathErr := errors.Is(err, &fs.PathError{})
-
 	if err != nil {
-		if !isPathErr {
+		var pathErr *fs.PathError
+		if !errors.As(err, &pathErr) {
 			panic(fmt.Errorf("os.RemoveAll returned unknown error: %v", err))
 		}
 

@@ -33,15 +33,25 @@ func LookPath(path string) (string, error) {
 	return path, err
 }
 
-type CleanupFunc func() int
+type cleanupFunc func() int
 
-func WaitForCancel(cleanup CleanupFunc) {
+func AwaitCancel(cleanup cleanupFunc) {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(c)
 
-	// block until a signal is received
-	<-c
-	log.Global.Info("CTRL+C received. Cancelling current operation...")
-	code := cleanup()
-	os.Exit(code)
+	log.Global.Infof("Received signal: %s. Shutting down gracefully...", <-c)
+	os.Exit(cleanup())
+}
+
+func AwaitCancelWithChannel(cleanup cleanupFunc, signalChan chan os.Signal) {
+	if cap(signalChan) < 2 {
+		log.Global.Fatal("signalChan must have a minimum capacity of 2 elements!")
+	}
+
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(signalChan)
+
+	log.Global.Infof("Received signal: %s. Shutting down gracefully...", <-signalChan)
+	os.Exit(cleanup())
 }

@@ -1,18 +1,25 @@
-# IntelliJ IDEA
-.idea
-.ijwb
+# .gitignore - Go Operations Toolkit
 
-# JetBrains Fleet
-.fleet
+###> general/editors ###
+
+# IntelliJ IDEA
+.idea/*
 
 # VS Code
-.vscode
+.vscode/*
+###>
 
-# Build folder
-build
+###> general/secret ###
 
-# Distribution folder
-dist
+# secrets
+secrets/*
+
+# Vault data
+data/*
+!data/.gitkeep
+###>
+
+###> source/sources ###
 
 # Binaries
 *.exe
@@ -20,12 +27,23 @@ dist
 *.dll
 *.so
 *.dylib
+###>
+
+###> source/tests ###
 
 # Tests
 *.test
 
 # Go coverage tool output
 *.out
+###>
+
+###> source/temp ###
 
 # Bazel output
 bazel-*
+
+# distribution
+dist/*
+build/*
+###>

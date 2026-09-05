@@ -10,15 +10,15 @@ import (
 var (
 	// Commands is a slice of CLIOpt options for subcommands of the 'ssolo' CLI
 	Commands = []app.CLIOpt{
+		NewInitCommand,
 		NewGitLabCommand,
 	}
 )
 
 func NewRootCommand(ssolo *app.State) *cobra.Command {
 	var (
-		label       string
-		environment string
-		namespace   string
+		label     string
+		namespace string
 	)
 
 	cmd := &cobra.Command{
@@ -39,14 +39,11 @@ func NewRootCommand(ssolo *app.State) *cobra.Command {
 		},
 	}
 
-	// Kubernetes Flags
+	// All Kubernetes Flags
 	//a.KubeClient.Flags.Namespace = util.StrPtr(app.DefaultNamespace)
 	//a.KubeClient.Flags.AddFlags(cmd.PersistentFlags())
 
-	cmd.PersistentFlags().StringVarP(&label, "label", "l", app.DefaultLabel, "The Kubernetes label to filter resources by")
-	cmd.PersistentFlags().StringVarP(&environment, "environment", "e", "dev", "The execution environment to use (dev, stage, prod)")
-	cmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "",
-		"The Kubernetes namespace to use. None equates to checking the entire cluster.")
+	addKubernetesFlags(cmd, &label, &namespace)
 
 	// add subcommands
 	for _, opt := range Commands {
@@ -54,4 +51,10 @@ func NewRootCommand(ssolo *app.State) *cobra.Command {
 	}
 
 	return cmd
+}
+
+func addKubernetesFlags(cmd *cobra.Command, label, namespace *string) {
+	cmd.PersistentFlags().StringVarP(label, "label", "l", app.DefaultLabel, "The Kubernetes label to filter resources by")
+	cmd.PersistentFlags().StringVarP(namespace, "namespace", "n", app.DefaultNamespace,
+		"The Kubernetes namespace to use. None equates to checking the entire cluster.")
 }

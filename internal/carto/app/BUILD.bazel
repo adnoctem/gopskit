@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "app",
+    srcs = ["app.go"],
+    importpath = "github.com/fmjstudios/gopskit/internal/carto/app",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pkg/core",
+        "//pkg/fsi",
+        "//pkg/helm",
+        "//pkg/kube",
+        "//pkg/log",
+        "//pkg/proc",
+        "//pkg/stamp",
+        "@com_github_spf13_cobra//:cobra",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":app",
+    visibility = ["//:__subpackages__"],
+)

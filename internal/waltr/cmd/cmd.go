@@ -15,12 +15,12 @@ var (
 		NewConfigureCommand,
 		NewPrepareCommand,
 		NewTransitCommand,
-		NewTestCommand,
 	}
 
 	// PrepareSubcommands is a slice of CLIOpt options for subcommands of the 'prepare' subcommand
 	PrepareSubcommands = []app.CLIOpt{
 		NewPrepareKeycloakCommand,
+		NewPrepareGitLabCommand,
 	}
 )
 
@@ -49,10 +49,6 @@ func NewRootCommand(waltr *app.State) *cobra.Command {
 		},
 		SilenceUsage: true,
 	}
-
-	// Kubernetes Flags
-	//a.KubeClient.Flags.Namespace = util.StrPtr(app.DefaultNamespace)
-	//a.KubeClient.Flags.AddFlags(cmd.PersistentFlags())
 
 	cmd.PersistentFlags().StringVarP(&environment, "environment", "e", "dev", "The execution environment to use (dev, stage, prod)")
 	cmd.PersistentFlags().StringVarP(&label, "label", "l", app.DefaultLabel, "The Kubernetes label to filter resources by")

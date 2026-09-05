@@ -3,14 +3,13 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/fmjstudios/gopskit/internal/waltr/app"
 	"github.com/fmjstudios/gopskit/internal/waltr/util"
+	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
 	"github.com/fmjstudios/gopskit/pkg/core"
 	"github.com/fmjstudios/gopskit/pkg/helpers"
 	"github.com/fmjstudios/gopskit/pkg/proc"
-	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/spf13/cobra"
 )
@@ -53,16 +52,17 @@ func NewPrepareKeycloakCommand(app *app.State) *cobra.Command {
 			app.Log.Infof("Port-forwarding Vault instance: %s", pods[0].Name)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			go func() {
-				err := app.Kube.PortForward(ctx, pods[0])
+			readyChan := make(chan struct{})
+			go func(rc chan struct{}) {
+				err := app.Kube.PortForward(ctx, pods[0], rc)
 				if err != nil {
 					panic(err)
 				}
-			}()
+			}(readyChan)
+			<-readyChan
 
 			// add token
-			err = app.VaultClient.SetToken(token)
-			if err != nil {
+			if err := app.Vault.SetToken(&apivault.Credentials{Token: token}); err != nil {
 				return fmt.Errorf("could not set token: %v", err)
 			}
 
@@ -74,7 +74,7 @@ func NewPrepareKeycloakCommand(app *app.State) *cobra.Command {
 			}
 
 			if !helpers.SliceContains(rola, r) || overwrite {
-				_, err := app.VaultClient.Auth.KubernetesWriteAuthRole(context.Background(), r,
+				err := app.Vault.KubernetesWriteAuthRole(context.Background(), r,
 					schema.KubernetesWriteAuthRoleRequest{
 						Audience:                      "vault",
 						BoundServiceAccountNames:      []string{r},
@@ -95,34 +95,42 @@ func NewPrepareKeycloakCommand(app *app.State) *cobra.Command {
 				app.Log.Infof("skipped configuration of Vault Kubernetes Auth Role %s for Keycloak", r)
 			}
 
-			// create PostgreSQL credentials
+			// create Admin credentials
+			const adminPath = "keycloak/config"
+			adminPass, err := util.GeneratePasswordFromPolicy(app, "alphanumeric-password")
+			if err != nil {
+				return err
+			}
+
+			adminExists := util.HasKvV2Secret(app, adminPath, "kv/")
+			if !adminExists || overwrite {
+				err := util.WriteKvV2Secret(app, adminPath, "kv/", map[string]interface{}{
+					"username": "mg",
+					"password": adminPass,
+				})
+
+				if err != nil {
+					return err
+				}
+
+				app.Log.Infof("configured Keycloak Admin credentials at path: %s", adminPath)
+			} else {
+				app.Log.Infof("skipped configuration of Keycloak Admin credentials at path: %s", adminPath)
+			}
+
+			// create PostgreSQL credentials (skip if exists)
 			const psqlPath = "keycloak/credentials/postgresql"
 			psqlPass, err := util.GeneratePasswordFromPolicy(app, "alphanumeric-password")
 			if err != nil {
 				return err
 			}
 
-			var exists bool
-			_, err = app.VaultClient.Secrets.KvV2Read(context.Background(), psqlPath, vault.WithMountPath("kv/"))
-			if err != nil {
-				// mitigate empty result
-				if strings.Contains(err.Error(), "404 Not Found") {
-					err = nil
-					exists = false
-				}
-			} else {
-				exists = true
-			}
-
-			if !exists {
-				// write
-				_, err = app.VaultClient.Secrets.KvV2Write(context.Background(), psqlPath, schema.KvV2WriteRequest{
-					Data: map[string]interface{}{
-						"username": "keycloak",
-						"password": psqlPass,
-					},
-					Options: nil,
-				}, vault.WithMountPath("kv/"))
+			psqlExists := util.HasKvV2Secret(app, psqlPath, "kv/")
+			if !psqlExists || overwrite {
+				err := util.WriteKvV2Secret(app, psqlPath, "kv/", map[string]interface{}{
+					"username": "keycloak",
+					"password": psqlPass,
+				})
 
 				if err != nil {
 					return err
@@ -137,8 +145,6 @@ func NewPrepareKeycloakCommand(app *app.State) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().BoolVar(&overwrite, "overwrite", false, "Overwrite existing configuration")
-	cmd.PersistentFlags().StringVarP(&token, "token", "t", "", "The Vault root token")
-
+	addPrepareFlags(cmd, &overwrite, &token)
 	return cmd
 }

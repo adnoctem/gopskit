@@ -99,10 +99,10 @@ func GenerateDiffieHellmanParams(opts ...DiffieHellmanOpt) (string, error) {
 	}
 
 	// allow CTRL+C
-	go proc.WaitForCancel(proc.CleanupFunc(func() int {
+	go proc.AwaitCancel(func() int {
 		cancel()
 		return 0
-	}))
+	})
 
 	raw, err := dhparam.GenerateWithContext(ctx, cfg.Bits, dhparam.GeneratorTwo, nil)
 	if err != nil {

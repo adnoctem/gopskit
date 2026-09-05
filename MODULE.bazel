@@ -17,9 +17,14 @@ use_repo(
     go_deps,
     "com_github_dgraph_io_badger_v4",
     "com_github_go_resty_resty_v2",
+    "com_github_google_go_cmp",
     "com_github_hashicorp_hcl_v2",
     "com_github_hashicorp_vault_client_go",
+    "com_github_imdario_mergo",
     "com_github_luzifer_go_dhparam",
+    "com_github_moby_term",
+    "com_github_nerzal_gocloak_v13",
+    "com_github_olekukonko_tablewriter",
     "com_github_spf13_cobra",
     "com_github_stretchr_testify",
     "com_github_vmware_labs_yaml_jsonpath",
@@ -28,10 +33,11 @@ use_repo(
     "io_k8s_apimachinery",
     "io_k8s_cli_runtime",
     "io_k8s_client_go",
+    "io_k8s_utils",
     "org_golang_x_mod",
-    "org_golang_x_sync",
     "org_golang_x_text",
     "org_uber_go_zap",
+    "sh_helm_helm_v3",
 )
 
 # DO NOT REMOVE! Cannot build with Resty without this

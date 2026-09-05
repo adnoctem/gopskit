@@ -6,6 +6,7 @@ go_library(
     importpath = "github.com/fmjstudios/gopskit/internal/ssolo/app",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//pkg/api/keycloak",
         "//pkg/core",
         "//pkg/fsi",
         "//pkg/kube",

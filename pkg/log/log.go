@@ -1,14 +1,12 @@
 package log
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -62,23 +60,12 @@ type Logger struct {
 	*zap.SugaredLogger
 }
 
-// Config builds a new zap.Config with optional Options for configuration
-func Config(opts ...zap.Option) *zap.Config {
+// Config builds a new, validated zap.Config using the DefaultConfig as its base
+func Config() *zap.Config {
 	c := DefaultConfig
-	g := new(errgroup.Group)
 
 	// assert that it builds
-	g.Go(func() error {
-		_, err := c.Build(opts...)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	// crash if it isn't so
-	if err := g.Wait(); err != nil {
+	if _, err := c.Build(); err != nil {
 		fmt.Printf("could not create zap.Config for Logger: %v", err)
 		os.Exit(1)
 	}
@@ -95,23 +82,14 @@ func New(opts ...Option) *Logger {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
-	errg, _ := errgroup.WithContext(context.Background())
 	for _, opt := range opts {
-		errg.Go(func() error {
-			opt(l)
-			return nil
-		})
-	}
-
-	// crash if it isn't so
-	if err := errg.Wait(); err != nil {
-		fmt.Printf("could not configure zap.Config for Logger: %v", err)
-		os.Exit(1)
+		opt(l)
 	}
 
 	lgr, err := l.conf.Build()
 	if err != nil {
 		fmt.Printf("could not build Config for Logger: %v", err)
+		os.Exit(1)
 	}
 
 	return &Logger{

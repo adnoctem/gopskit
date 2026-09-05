@@ -6,23 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
-	"os/signal"
 
+	"github.com/fmjstudios/gopskit/pkg/proc"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 )
-
-//type PortForwardOptions struct {
-//	PodName   string
-//	Container string
-//	Namespace string
-//	Address   []string
-//	Ports     []string
-//}
 
 type PortForwarder interface {
 	ForwardPorts(method string, restConfig *rest.Config, url *url.URL, ports []string, stopChan,
@@ -58,31 +49,25 @@ func (*DefaultPortForwarder) ForwardPorts(method string, restConfig *rest.Config
 }
 
 // PortForward port-forwards a remote port of a Kubernetes container to the local machine
-func (c *Client) PortForward(ctx context.Context, pod corev1.Pod) error {
+func (c *Client) PortForward(ctx context.Context, pod corev1.Pod, readyChan chan struct{}) error {
 	if pod.Status.Phase != corev1.PodRunning {
-		return fmt.Errorf("uanble to forward ports to a pod that isn't running. Current status: %v", pod.Status.Phase)
+		return fmt.Errorf("unable to forward port of a non-running Pod. current status: %v", pod.Status.Phase)
 	}
 
 	// create control channels
 	stopChan := make(chan struct{})
-	readyChan := make(chan struct{})
+	nctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
-	defer signal.Stop(signals)
-
-	returnCtx, returnCtxCancel := context.WithCancel(ctx)
-	defer returnCtxCancel()
+	// allow CTRL+C
+	go proc.AwaitCancel(func() int {
+		cancel()
+		return 0
+	})
 
 	go func() {
-		select {
-		case <-signals:
-		case <-returnCtx.Done():
-		}
-
-		if stopChan != nil {
-			close(stopChan)
-		}
+		<-nctx.Done()
+		close(stopChan)
 	}()
 
 	req := c.Client.CoreV1().

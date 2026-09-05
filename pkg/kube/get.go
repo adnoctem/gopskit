@@ -10,91 +10,47 @@ import (
 )
 
 func (c *Client) Namespaces(opts metav1.ListOptions) ([]corev1.Namespace, error) {
-	ns, err := c.Client.CoreV1().Namespaces().List(context.Background(), opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return ns.Items, nil
+	l, err := c.Client.CoreV1().Namespaces().List(context.Background(), opts)
+	return items(l, err, func(l *corev1.NamespaceList) []corev1.Namespace { return l.Items })
 }
 
 func (c *Client) Pods(namespace string, opts metav1.ListOptions) ([]corev1.Pod, error) {
-	podL, err := c.Client.CoreV1().Pods(namespace).List(context.Background(), opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return podL.Items, nil
+	l, err := c.Client.CoreV1().Pods(namespace).List(context.Background(), opts)
+	return items(l, err, func(l *corev1.PodList) []corev1.Pod { return l.Items })
 }
 
 func (c *Client) Service(namespace, name string, opts metav1.GetOptions) (*corev1.Service, error) {
-	svc, err := c.Client.CoreV1().Services(namespace).Get(context.Background(), name, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return svc, nil
+	return get(c.Client.CoreV1().Services(namespace).Get(context.Background(), name, opts))
 }
 
 func (c *Client) Services(namespace string, opts metav1.ListOptions) ([]corev1.Service, error) {
-	svcL, err := c.Client.CoreV1().Services(namespace).List(context.Background(), opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return svcL.Items, nil
+	l, err := c.Client.CoreV1().Services(namespace).List(context.Background(), opts)
+	return items(l, err, func(l *corev1.ServiceList) []corev1.Service { return l.Items })
 }
 
 func (c *Client) ConfigMap(namespace, name string, opts metav1.GetOptions) (*corev1.ConfigMap, error) {
-	conf, err := c.Client.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return conf, nil
+	return get(c.Client.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, opts))
 }
 
 func (c *Client) ConfigMaps(namespace string, opts metav1.ListOptions) ([]corev1.ConfigMap, error) {
-	confL, err := c.Client.CoreV1().ConfigMaps(namespace).List(context.Background(), opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return confL.Items, nil
+	l, err := c.Client.CoreV1().ConfigMaps(namespace).List(context.Background(), opts)
+	return items(l, err, func(l *corev1.ConfigMapList) []corev1.ConfigMap { return l.Items })
 }
 
 func (c *Client) Secret(namespace string, name string, opts metav1.GetOptions) (*corev1.Secret, error) {
-	sec, err := c.Client.CoreV1().Secrets(namespace).Get(context.Background(), name, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return sec, nil
+	return get(c.Client.CoreV1().Secrets(namespace).Get(context.Background(), name, opts))
 }
 
 func (c *Client) Secrets(namespace string, opts metav1.ListOptions) ([]corev1.Secret, error) {
-	secL, err := c.Client.CoreV1().Secrets(namespace).List(context.Background(), opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return secL.Items, nil
+	l, err := c.Client.CoreV1().Secrets(namespace).List(context.Background(), opts)
+	return items(l, err, func(l *corev1.SecretList) []corev1.Secret { return l.Items })
 }
 
 func (c *Client) Ingresses(namespace string, opts metav1.ListOptions) ([]networkingv1.Ingress, error) {
-	ingL, err := c.Client.NetworkingV1().Ingresses(namespace).List(context.Background(), opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return ingL.Items, nil
+	l, err := c.Client.NetworkingV1().Ingresses(namespace).List(context.Background(), opts)
+	return items(l, err, func(l *networkingv1.IngressList) []networkingv1.Ingress { return l.Items })
 }
 
 func (c *Client) StorageClass(name string, opts metav1.GetOptions) (*storagev1.StorageClass, error) {
-	storC, err := c.Client.StorageV1().StorageClasses().Get(context.Background(), name, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return storC, nil
+	return get(c.Client.StorageV1().StorageClasses().Get(context.Background(), name, opts))
 }
