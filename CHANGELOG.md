@@ -1,3 +1,16 @@
+## [1.1.0](https://github.com/adnoctem/gopskit/compare/v1.0.2...v1.1.0) (2026-09-05)
+
+### Features
+
+* **plattr:** add `plattr`  implementation ([e011a60](https://github.com/adnoctem/gopskit/commit/e011a60ac3d3a8c918c172ed949e7cb1d63d3340))
+
+### Bug Fixes
+
+* **pkg/log:** add global `Logger` ([483741d](https://github.com/adnoctem/gopskit/commit/483741de3931684ec57718ed6cf8dbb23d3d6543))
+* **pkg/proc:** prevent read from closed `std` pipes ([ae55266](https://github.com/adnoctem/gopskit/commit/ae552667de48d6ed798ef3373ce3b80c8ed05250))
+* **plattr:** fix bug causing panic ([119db49](https://github.com/adnoctem/gopskit/commit/119db49f9d0536f490c95d66c9938f5cd5631fef))
+* **waltr:** fix bug causing panic ([acc06da](https://github.com/adnoctem/gopskit/commit/acc06daa1f0a371b1a62847c2fa3087d1be5eddf))
+
 ## [1.0.2](https://github.com/adnoctem/gopskit/compare/v1.0.1...v1.0.2) (2024-11-21)
 
 ### Bug Fixes
