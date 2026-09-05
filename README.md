@@ -23,15 +23,15 @@ build system in combination with their first-party [Gazelle][gazelle] `BUILD` fi
 
 ## 📖 Overview
 
-The toolkit offers a plethora of functionalities like setting up HashCorp's [Vault][vault] with [`waltr`][waltr],
-registering various applications for SSO authentication with [Keycloak][keycloak] using [`ssolo`][ssolo]. Never
-write [Helmfile][helmfile] `values.yaml` template files to manage applications on your cluster again. Instead, generate
-them using [`fillr`][fillr]. Are you running your own custom private Certificate Authority using
-[Smallstep's CA][smallstep_certificates]? Then you'd likely want to generate and manage PKI values using
-[`steppa`][steppa]. The German KBA delivers data in a custom bespoke text-based format, which purely relies on columns
-to separate data. _That ain't SQL..._ So let's swiftly generate some usable SQL import script using [`amtrac`][amtrac].
 Managing high-stakes backbone components like Vault or Keycloak themselves with Helm? [`carto`][carto] renders,
-diffs, applies and rolls back charts using a deterministic base+overlay values-merge strategy.
+diffs, applies and rolls back charts using a deterministic base+overlay values-merge strategy - it's the intended
+replacement for our [Helmfile][helmfile] workflows, [`fillr`][fillr] included. The toolkit also offers a plethora of
+other functionalities like setting up HashiCorp's [Vault][vault] with [`waltr`][waltr], registering various
+applications for SSO authentication with [Keycloak][keycloak] using [`ssolo`][ssolo]. Are you running your own custom
+private Certificate Authority using [Smallstep's CA][smallstep_certificates]? Then you'd likely want to generate and
+manage PKI values using [`steppa`][steppa]. The German KBA delivers data in a custom bespoke text-based format, which
+purely relies on columns to separate data. _That ain't SQL..._ So let's swiftly generate some usable SQL import
+script using [`amtrac`][amtrac].
 
 ## ✨ TL;DR
 
@@ -45,12 +45,12 @@ bazel build //...
 Like most modern [Go][go] projects the various executables are located within the [cmd][cmd] directory. Here's a
 quick-reference list as an overview:
 
+- [`carto`][carto]: manage Kubernetes backbone components (Helm charts) with the Helm SDK
 - [`ssolo`][ssolo]: manage SSO authentication for various apps using Keycloak
-- [`waltr`][waltr]: configure and manage [HashCorp's Vault][vault]
-- [`fillr`][fillr]: create Helmfile templates automatically
+- [`waltr`][waltr]: configure and manage [HashiCorp's Vault][vault]
 - [`steppa`][steppa]: generate and manage SmallStep PKI values
 - [`amtrac`][amtrac]: generate SQL dumps from the German KBA's data files using Docker
-- [`carto`][carto]: manage Kubernetes backbone components (Helm charts) with the Helm SDK
+- [`fillr`][fillr]: **deprecated**, superseded by [`carto`][carto] - create Helmfile templates automatically
 
 ### 🔃 Contributing
 

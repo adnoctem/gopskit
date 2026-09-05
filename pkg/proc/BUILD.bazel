@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "proc",
@@ -16,4 +16,15 @@ alias(
     name = "go_default_library",
     actual = ":proc",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "proc_test",
+    srcs = [
+        "errors_test.go",
+        "proc_test.go",
+        "util_test.go",
+    ],
+    embed = [":proc"],
+    deps = ["@com_github_stretchr_testify//assert"],
 )

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: testchart
+description: A minimal chart fixture for pkg/helm tests
+version: 0.1.0
+appVersion: "1.0"

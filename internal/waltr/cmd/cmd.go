@@ -34,7 +34,7 @@ func NewRootCommand(waltr *app.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              app.Name,
 		Short:            fmt.Sprintf("%s CLI", app.Name),
-		Long:             "Manage HashCorp Vault on Kubernetes",
+		Long:             "Manage HashiCorp Vault on Kubernetes",
 		TraverseChildren: true,
 		SilenceErrors:    true,
 		RunE: func(cmd *cobra.Command, args []string) error {

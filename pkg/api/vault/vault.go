@@ -1,5 +1,5 @@
 // package vault implements an HTTP API client for the secret-management solution Vault from
-// HashCorp Inc.
+// HashiCorp Inc.
 package vault
 
 import (
@@ -72,10 +72,10 @@ func (c *Credentials) Load() error {
 	return nil
 }
 
-// Client wraps the official HashCorp Vault HTTP API client, adding credential persistence and
+// Client wraps the official HashiCorp Vault HTTP API client, adding credential persistence and
 // a smaller, purpose-built surface for the operations gopskit's CLIs need.
 type Client struct {
-	// api is the underlying HashCorp Vault HTTP API client we're wrapping
+	// api is the underlying HashiCorp Vault HTTP API client we're wrapping
 	api *vault.Client
 
 	// auth are the credentials (root token + unseal/recovery keys) currently loaded for this client

@@ -90,7 +90,8 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 				},
 			}
 
-			// create secret (or skip)
+			// create secret (or skip) - independent of the storage class below, so a missing
+			// secret is always created even if the storage class already exists (and vice versa)
 			_, err := app.Kube.Secret(secret.Namespace, secret.Name, metav1.GetOptions{})
 			if err != nil {
 				secretExists = false
@@ -100,7 +101,11 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 				app.Log.Infof("Skipping creation of Hetzner Volume Encryption Secret in namespace: %s. Secret exists: %s",
 					secret.Namespace,
 					secret.Name)
-				return nil
+			} else {
+				if err := app.Kube.CreateSecret(secret.Namespace, secret, metav1.CreateOptions{}); err != nil {
+					return err
+				}
+				app.Log.Infof("Successfully created Hetzner Volume Encryption Secret: %s in namespace: %s", secret.Name, secret.Namespace)
 			}
 
 			// create storage-class (or skip)

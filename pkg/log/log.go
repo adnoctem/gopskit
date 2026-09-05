@@ -93,6 +93,7 @@ func New(opts ...Option) *Logger {
 
 	return &Logger{
 		log:           lgr,
+		conf:          l.conf,
 		SugaredLogger: lgr.Sugar(),
 	}
 }

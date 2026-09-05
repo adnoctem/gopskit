@@ -5,7 +5,7 @@ repos:
     hooks:
       - id: check-yaml
         args: ["--allow-multiple-documents"]
-        exclude: (^charts/.*/templates/|^charts/.*/crds/)
+        exclude: (^charts/.*/templates/|^charts/.*/crds/|.*testdata/testchart/.*)
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: mixed-line-ending

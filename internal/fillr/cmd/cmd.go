@@ -24,9 +24,10 @@ func NewRootCommand(fillr *app.State) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   fillr.Name + " [FILE]",
-		Short: fmt.Sprintf("%s CLI", fillr.Name),
-		Long:  "Manage authentication for Kubernetes applications using Keycloak",
+		Use:        fillr.Name + " [FILE]",
+		Short:      fmt.Sprintf("%s CLI", fillr.Name),
+		Long:       "Fill Helm values templates - deprecated, superseded by carto",
+		Deprecated: "superseded by carto, which replaces our Helmfile workflows entirely",
 		Args: func(cmd *cobra.Command, args []string) error {
 			// ensure 1 argument
 			if err := cobra.ExactArgs(1)(cmd, args); err != nil {

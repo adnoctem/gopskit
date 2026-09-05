@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "config",
@@ -22,4 +22,18 @@ alias(
     name = "go_default_library",
     actual = ":config",
     visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "config_test",
+    srcs = [
+        "config_test.go",
+        "hooks_test.go",
+    ],
+    embed = [":config"],
+    deps = [
+        "//pkg/proc",
+        "@com_github_stretchr_testify//assert",
+        "@io_k8s_api//core/v1:core",
+    ],
 )

@@ -275,14 +275,15 @@ func (p *PlatformPaths) findConfigFile() error {
 
 	for _, path := range p.ConfigPaths {
 		_, err := os.Stat(path)
-		if errors.Is(err, os.ErrNotExist) {
+		switch {
+		case err == nil:
+			p.Exists[path] = true
+		case errors.Is(err, os.ErrNotExist):
 			p.Exists[path] = false
-		} else if err != nil {
+		default:
 			p.Exists[path] = false
 			return fmt.Errorf("could not stat configuration file: %s. Error: %v", path, err)
 		}
-
-		p.Exists[path] = true
 	}
 
 	return nil

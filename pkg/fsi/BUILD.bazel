@@ -24,7 +24,13 @@ go_library(
 
 go_test(
     name = "fsi_test",
-    srcs = ["paths_test.go"],
+    srcs = [
+        "directories_test.go",
+        "files_test.go",
+        "fsi_test.go",
+        "git_test.go",
+        "paths_test.go",
+    ],
     embed = [":fsi"],
     deps = ["@com_github_stretchr_testify//assert"],
 )

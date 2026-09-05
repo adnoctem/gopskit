@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,9 +22,12 @@ func (c *Client) Apply(schema schema.GroupVersionResource, resource *unstructure
 	var result *unstructured.Unstructured
 	var err error
 
-	dc, err := dynamic.NewForConfig(c.Config)
-	if err != nil {
-		return err
+	// scope to the resource's own namespace when it has one - dc.Resource(schema) alone only
+	// works for cluster-scoped resources (e.g. StorageClass); a namespaced one (the common case
+	// for rendered manifests) needs the namespaced ResourceInterface or every call below 404s
+	var ri dynamic.ResourceInterface = c.Dynamic.Resource(schema)
+	if ns := resource.GetNamespace(); ns != "" {
+		ri = c.Dynamic.Resource(schema).Namespace(ns)
 	}
 
 	getOpts := metav1.GetOptions{}
@@ -41,14 +45,14 @@ func (c *Client) Apply(schema schema.GroupVersionResource, resource *unstructure
 		updateOpts = *opts.UpdateOptions
 	}
 
-	result, err = dc.Resource(schema).Get(context.Background(), opts.Name, getOpts)
-	if err != nil {
+	result, err = ri.Get(context.Background(), opts.Name, getOpts)
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	exists := result.Object["metadata"] != nil
+	exists := err == nil && result.Object["metadata"] != nil
 	if !exists {
-		result, err = dc.Resource(schema).Create(context.Background(), resource, createOpts)
+		result, err = ri.Create(context.Background(), resource, createOpts)
 		if err != nil {
 			return err
 		}
@@ -57,7 +61,7 @@ func (c *Client) Apply(schema schema.GroupVersionResource, resource *unstructure
 		return nil
 	}
 
-	result, err = dc.Resource(schema).Update(context.Background(), resource, updateOpts)
+	result, err = ri.Update(context.Background(), resource, updateOpts)
 	if err != nil {
 		return err
 	}

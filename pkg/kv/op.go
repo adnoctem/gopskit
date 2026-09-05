@@ -1,10 +1,10 @@
 package kv
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/adnoctem/gopskit/pkg/helpers"
 	"github.com/dgraph-io/badger/v4"
 )
 
@@ -89,10 +89,9 @@ func (d *Database) set(key, value []byte) error {
 	return nil
 }
 
-// Has checks if the database contains a key by trying to read the value at the
-// given key via the use of Get. If the method returns an error it is determined
-// that the value does not exist and the error from Get is propagated alongside
-// a false return value. Otherwise,  it does and a nil-error is returned.
+// Has checks if the database contains a key by trying to read the value at the given key. A
+// missing key is reported as (false, nil), not an error - only a genuine underlying failure is
+// propagated as a non-nil error.
 func (d *Database) Has(key string) (bool, error) {
 	err := d.ensureNonNamespaced(key)
 	if err != nil {
@@ -101,6 +100,10 @@ func (d *Database) Has(key string) (bool, error) {
 	k := []byte(key)
 	value, err := d.get(k)
 	if err != nil {
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return false, nil
+		}
+
 		return false, err
 	}
 
@@ -119,9 +122,6 @@ func (d *Database) Namespaces() []string {
 
 // Delete deletes a key from the database
 func (d *Database) Delete(key string) error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
 	err := d.delete([]byte(key))
 	if err != nil {
 		return err
@@ -190,10 +190,10 @@ func (d *Database) namespace(namespace, key string) []byte {
 	return []byte(prefix + key)
 }
 
-// ensure non-namespaced ensures that a given key value contains no slashes and consists only of
-// letters, thereby equating to a valid key.
+// ensure non-namespaced ensures that a given key value contains no slashes, thereby preventing
+// callers from passing an already-namespaced key (namespace() applies its own "namespace/" prefix).
 func (d *Database) ensureNonNamespaced(key string) error {
-	if strings.Contains(key, "/") && helpers.OnlyLetters(key) {
+	if strings.Contains(key, "/") {
 		return fmt.Errorf("cannot set value for a namespaced key. please exclude namespaces from the key")
 	}
 

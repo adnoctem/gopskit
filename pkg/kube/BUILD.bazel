@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "kube",
@@ -22,6 +22,7 @@ go_library(
         "@io_k8s_api//core/v1:core",
         "@io_k8s_api//networking/v1:networking",
         "@io_k8s_api//storage/v1:storage",
+        "@io_k8s_apimachinery//pkg/api/errors",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
         "@io_k8s_apimachinery//pkg/apis/meta/v1/unstructured",
         "@io_k8s_apimachinery//pkg/runtime/schema",
@@ -43,4 +44,29 @@ alias(
     name = "go_default_library",
     actual = ":kube",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "kube_test",
+    srcs = [
+        "apply_test.go",
+        "generic_test.go",
+        "kube_test.go",
+    ],
+    embed = [":kube"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@io_k8s_api//apps/v1:apps",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_api//networking/v1:networking",
+        "@io_k8s_api//storage/v1:storage",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1/unstructured",
+        "@io_k8s_apimachinery//pkg/runtime",
+        "@io_k8s_apimachinery//pkg/runtime/schema",
+        "@io_k8s_client_go//dynamic/fake",
+        "@io_k8s_client_go//kubernetes/fake",
+        "@io_k8s_client_go//kubernetes/scheme",
+        "@io_k8s_client_go//testing",
+    ],
 )

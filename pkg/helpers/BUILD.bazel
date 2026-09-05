@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "helpers",
@@ -21,4 +21,17 @@ alias(
     name = "go_default_library",
     actual = ":helpers",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "helpers_test",
+    srcs = [
+        "crypto_test.go",
+        "merge_test.go",
+        "pointers_test.go",
+        "primitives_test.go",
+        "slices_test.go",
+    ],
+    embed = [":helpers"],
+    deps = ["@com_github_stretchr_testify//assert"],
 )

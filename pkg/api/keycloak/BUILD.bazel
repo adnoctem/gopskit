@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "keycloak",
@@ -27,4 +27,14 @@ alias(
     name = "go_default_library",
     actual = ":keycloak",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "keycloak_test",
+    srcs = ["keycloak_test.go"],
+    embed = [":keycloak"],
+    deps = [
+        "@com_github_nerzal_gocloak_v14//:gocloak",
+        "@com_github_stretchr_testify//assert",
+    ],
 )

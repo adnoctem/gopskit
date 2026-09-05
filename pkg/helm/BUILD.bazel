@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "helm",
@@ -26,6 +26,7 @@ go_library(
         "@sh_helm_helm_v3//pkg/cli",
         "@sh_helm_helm_v3//pkg/registry",
         "@sh_helm_helm_v3//pkg/release",
+        "@sh_helm_helm_v3//pkg/storage/driver",
     ],
 )
 
@@ -33,4 +34,27 @@ alias(
     name = "go_default_library",
     actual = ":helm",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "helm_test",
+    srcs = [
+        "apply_test.go",
+        "chart_test.go",
+        "diff_test.go",
+        "helm_test.go",
+        "history_test.go",
+        "rollback_test.go",
+        "values_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":helm"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@sh_helm_helm_v3//pkg/action",
+        "@sh_helm_helm_v3//pkg/chartutil",
+        "@sh_helm_helm_v3//pkg/kube/fake",
+        "@sh_helm_helm_v3//pkg/storage",
+        "@sh_helm_helm_v3//pkg/storage/driver",
+    ],
 )

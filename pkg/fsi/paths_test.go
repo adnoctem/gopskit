@@ -35,3 +35,37 @@ func TestNew(t *testing.T) {
 	got = p.Cache
 	asrt.Contains(got, osc)
 }
+
+func TestPathsWithAppName(t *testing.T) {
+	asrt := assert.New(t)
+
+	p, err := Paths(WithAppName("myapp"))
+	asrt.NoError(err)
+	asrt.Equal("myapp", p.AppName)
+	asrt.Contains(p.Config, "myapp")
+}
+
+func TestPathsWithConfigPathExistsTracking(t *testing.T) {
+	asrt := assert.New(t)
+
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "config.yaml")
+	missing := filepath.Join(dir, "missing.yaml")
+	asrt.NoError(os.WriteFile(existing, []byte("x"), 0600))
+
+	p, err := Paths(WithConfigPath(existing, missing))
+	asrt.NoError(err)
+
+	// an existing config path must be tracked as such
+	asrt.True(p.Exists[existing])
+	// a genuinely missing config path must not be silently reported as existing
+	asrt.False(p.Exists[missing])
+}
+
+func TestPathsWithConfigType(t *testing.T) {
+	asrt := assert.New(t)
+
+	p, err := Paths(WithConfigType("json"))
+	asrt.NoError(err)
+	asrt.Equal([]string{"json"}, p.ConfigTypes)
+}

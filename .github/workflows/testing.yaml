@@ -86,7 +86,9 @@ jobs:
 
       - name: Test Bazel artifacts
         run: |
-          bazel --output_user_root=${{ env.CACHE_PATH }} test //...
+          bazel --output_user_root=${{ env.CACHE_PATH }} test //... \
+            --@io_bazel_rules_go//go/config:race \
+            --test_output=errors
 
   dispatch:
     runs-on: ubuntu-latest

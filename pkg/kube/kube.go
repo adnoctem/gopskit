@@ -9,6 +9,7 @@ import (
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -35,8 +36,14 @@ type Client struct {
 	// Config is the rest.Config for which the client was built
 	Config *rest.Config
 
-	// Client is the embedded Kubernetes ClientSet
-	Client *kubernetes.Clientset
+	// Client is the embedded Kubernetes ClientSet, typed as the kubernetes.Interface it
+	// satisfies (rather than the concrete *kubernetes.Clientset) so tests can substitute
+	// k8s.io/client-go/kubernetes/fake.NewSimpleClientset without a live cluster
+	Client kubernetes.Interface
+
+	// Dynamic is the dynamic (unstructured) client Apply uses, typed as dynamic.Interface for
+	// the same reason as Client - so tests can substitute k8s.io/client-go/dynamic/fake
+	Dynamic dynamic.Interface
 
 	// flags are the Kubernetes-specific flags which will be injected into the CLI
 	Flags *genericclioptions.ConfigFlags
@@ -83,6 +90,11 @@ func NewClient(opts ...Opt) (*Client, error) {
 	}
 
 	kc.Client, err = kubernetes.NewForConfig(kc.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	kc.Dynamic, err = dynamic.NewForConfig(kc.Config)
 	if err != nil {
 		return nil, err
 	}

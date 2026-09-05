@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -85,6 +86,10 @@ func (a *Auth) Save() error {
 func (a *Auth) Load() error {
 	raw, err := fs.Read(a.path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ErrAuthPathNotFound
+		}
+
 		return err
 	}
 
@@ -442,6 +447,10 @@ func (kc *Client) isUnauthorizedErr(err error) bool {
 }
 
 func (kc *Client) hasTokenExpired() bool {
+	if kc.auth.JWT == nil {
+		return true
+	}
+
 	validUntil := kc.auth.Created.Add(time.Duration(kc.auth.JWT.ExpiresIn) * time.Second)
 	return validUntil.Before(time.Now())
 }

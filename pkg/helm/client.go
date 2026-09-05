@@ -54,23 +54,28 @@ func New(namespace string, opts ...ClientOpt) (*Client, error) {
 		}
 	}
 
-	if c.getter == nil {
-		return nil, fmt.Errorf("cannot create Helm client without a RESTClientGetter (use WithRESTClientGetter)")
-	}
-
 	c.settings = cli.New()
 	c.settings.SetNamespace(namespace)
 
-	regClient, err := registry.NewClient()
-	if err != nil {
-		return nil, fmt.Errorf("could not create Helm OCI registry client: %w", err)
-	}
+	// WithConfiguration (test-only) already supplies a fully-built action.Configuration - e.g. an
+	// in-memory storage driver and a fake Kube client - so the real getter-based Init below only
+	// runs when nothing has pre-populated cfg.
+	if c.cfg == nil {
+		if c.getter == nil {
+			return nil, fmt.Errorf("cannot create Helm client without a RESTClientGetter (use WithRESTClientGetter)")
+		}
 
-	c.cfg = new(action.Configuration)
-	if err := c.cfg.Init(c.getter, namespace, c.driver, c.debugLog); err != nil {
-		return nil, fmt.Errorf("could not initialize Helm action configuration: %w", err)
+		regClient, err := registry.NewClient()
+		if err != nil {
+			return nil, fmt.Errorf("could not create Helm OCI registry client: %w", err)
+		}
+
+		c.cfg = new(action.Configuration)
+		if err := c.cfg.Init(c.getter, namespace, c.driver, c.debugLog); err != nil {
+			return nil, fmt.Errorf("could not initialize Helm action configuration: %w", err)
+		}
+		c.cfg.RegistryClient = regClient
 	}
-	c.cfg.RegistryClient = regClient
 
 	return c, nil
 }
@@ -97,6 +102,17 @@ func WithDriver(driver string) ClientOpt {
 func WithDebugLog(fn action.DebugLog) ClientOpt {
 	return func(c *Client) error {
 		c.debugLog = fn
+		return nil
+	}
+}
+
+// WithConfiguration injects a pre-built Helm action.Configuration directly, bypassing New's normal
+// getter-based Init entirely - for tests to substitute an in-memory storage driver and a fake Kube
+// client (helm.sh/helm/v3/pkg/storage/driver.NewMemory, helm.sh/helm/v3/pkg/kube/fake) instead of a
+// live cluster.
+func WithConfiguration(cfg *action.Configuration) ClientOpt {
+	return func(c *Client) error {
+		c.cfg = cfg
 		return nil
 	}
 }

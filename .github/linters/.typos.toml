@@ -1,2 +1,10 @@
 [files]
 extend-exclude = []
+
+
+[default]
+extend-ignore-identifiers-re = [".*Hashi*", ".*HashiCorp.*"]
+
+[default.extend-identifiers]
+Hashi = "Hashi"
+HashiCorp = "HashiCorp"

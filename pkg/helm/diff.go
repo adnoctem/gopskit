@@ -38,8 +38,13 @@ func (c *Client) RenderManifest(name string, ch *chart.Chart, vals map[string]in
 	return rel.Manifest, nil
 }
 
-// ManifestDiff renders a human-readable delta between two manifests. Callers wanting to ignore
-// metadata noise should normalize both manifests beforehand.
+// ManifestDiff renders a human-readable delta between two manifests, or an empty string if they're
+// identical - diff.StringDiff itself always returns a non-empty result, even for equal inputs.
+// Callers wanting to ignore metadata noise should normalize both manifests beforehand.
 func ManifestDiff(current, proposed string) string {
+	if current == proposed {
+		return ""
+	}
+
 	return diff.StringDiff(current, proposed)
 }

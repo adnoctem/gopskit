@@ -33,7 +33,7 @@ func DeepMergeMap(dst, src map[string]interface{}) error {
 		} else if srcSl, ok := srcV.([]interface{}); ok {
 			if dstV, ok := dst[srcK]; ok {
 				if dstSl, ok := dstV.([]interface{}); ok {
-					dst[srcK] = append(dstSl, srcSl)
+					dst[srcK] = append(dstSl, srcSl...)
 					continue
 				}
 			}

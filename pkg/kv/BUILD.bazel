@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "kv",
@@ -11,7 +11,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/fsi",
-        "//pkg/helpers",
         "@com_github_dgraph_io_badger_v4//:badger",
     ],
 )
@@ -20,4 +19,14 @@ alias(
     name = "go_default_library",
     actual = ":kv",
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "kv_test",
+    srcs = ["kv_test.go"],
+    embed = [":kv"],
+    deps = [
+        "@com_github_dgraph_io_badger_v4//:badger",
+        "@com_github_stretchr_testify//assert",
+    ],
 )

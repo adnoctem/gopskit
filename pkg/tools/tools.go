@@ -106,6 +106,10 @@ func parseGitHubURL(url string) (string, string, error) {
 	}
 
 	ss := strings.Split(s, "/")
+	if len(ss) < 2 || ss[0] == "" || ss[1] == "" {
+		return "", "", fmt.Errorf("cannot parse owner/repo from GitHub URL: %s", url)
+	}
+
 	return ss[0], ss[1], nil
 }
 
