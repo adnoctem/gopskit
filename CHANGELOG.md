@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/adnoctem/gopskit/compare/v1.1.0...v1.1.1) (2026-09-05)
+
+### Bug Fixes
+
+* bump transitive dependencies to avoid CVEs ([7441367](https://github.com/adnoctem/gopskit/commit/744136713dd0d1588baaf8abedc31f8f01fcee63))
+
 ## [1.1.0](https://github.com/adnoctem/gopskit/compare/v1.0.2...v1.1.0) (2026-09-05)
 
 ### Features
