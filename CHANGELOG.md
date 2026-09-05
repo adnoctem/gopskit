@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/adnoctem/gopskit/compare/v1.1.1...v1.1.2) (2026-09-05)
+
+### Bug Fixes
+
+* add test suite for pkg/ and internal/, fixing bugs it surfaced ([0645539](https://github.com/adnoctem/gopskit/commit/0645539a8742fafea26133f88c181c3021aaf88e))
+
 ## [1.1.1](https://github.com/adnoctem/gopskit/compare/v1.1.0...v1.1.1) (2026-09-05)
 
 ### Bug Fixes
