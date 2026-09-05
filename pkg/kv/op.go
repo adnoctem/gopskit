@@ -2,11 +2,10 @@ package kv
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/dgraph-io/badger/v4"
 	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"golang.org/x/sync/errgroup"
-	"strings"
-	"time"
 )
 
 // enforce implementation of the interface
@@ -17,30 +16,11 @@ var _ Store = (*Database)(nil)
 // handled asynchronously, although the method itself is also thread-safe.
 func (d *Database) Get(key string) (value []byte, err error) {
 	// ensure we're getting clean keys
-	err = d.ensureNonNamespaced(key)
-	if err != nil {
-		return nil, err
-	}
-	k := []byte(key)
-
-	var bytes []byte
-	g := new(errgroup.Group)
-	g.Go(func() error {
-		value, err := d.get(k)
-		if err != nil {
-			return err
-		}
-
-		bytes = append(bytes, value...)
-		return nil
-	})
-
-	err = g.Wait()
-	if err != nil {
+	if err := d.ensureNonNamespaced(key); err != nil {
 		return nil, err
 	}
 
-	return bytes, nil
+	return d.get([]byte(key))
 }
 
 // get is the actual implementation of the retrieval of a value from the BadgerDB
@@ -78,28 +58,11 @@ func (d *Database) get(key []byte) (value []byte, err error) {
 // a certain value with the given OperationOpt options to configure the current operation.
 // The operation itself is handled asynchronously, although the method itself is also thread-safe.
 func (d *Database) Set(key string, value []byte) error {
-	err := d.ensureNonNamespaced(key)
-	if err != nil {
-		return err
-	}
-	k := []byte(key)
-
-	g := new(errgroup.Group)
-	g.Go(func() error {
-		err := d.set(k, value)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	err = g.Wait()
-	if err != nil {
+	if err := d.ensureNonNamespaced(key); err != nil {
 		return err
 	}
 
-	return nil
+	return d.set([]byte(key), value)
 }
 
 // get is the actual implementation of setting a value within the BadgerDB
@@ -198,10 +161,7 @@ func (d *Database) Close() error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	doneC := make(chan struct{})
-	go d.gc(doneC)
-	<-doneC
-
+	d.gc()
 	return d.kv.Close()
 }
 
@@ -242,19 +202,13 @@ func (d *Database) ensureNonNamespaced(key string) error {
 	return nil
 }
 
-// gc runs the garbage-collection for the BadgerDB which saves filesystem space. It is run
-// as a goroutine before closing the database connection.
-func (d *Database) gc(doneChan chan struct{}) {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-	again:
-		err := d.kv.RunValueLogGC(0.7)
-		if err == nil {
-			goto again
+// gc runs a single garbage-collection pass over the BadgerDB value log to reclaim filesystem
+// space, repeating until there's nothing left to reclaim. It's called synchronously, right before
+// closing the database connection.
+func (d *Database) gc() {
+	for {
+		if err := d.kv.RunValueLogGC(0.7); err != nil {
+			return
 		}
 	}
-
-	doneChan <- struct{}{}
 }

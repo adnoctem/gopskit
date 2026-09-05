@@ -6,6 +6,7 @@ go_library(
         "apply.go",
         "create.go",
         "exec.go",
+        "generic.go",
         "get.go",
         "kube.go",
         "port_forward.go",

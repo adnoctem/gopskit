@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"golang.org/x/sync/errgroup"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -90,30 +89,13 @@ type Opt func(p *PlatformPaths)
 //
 // Another way of obtaining a Platform object is by using New with the corresponding options.
 func DefaultPaths() (*PlatformPaths, error) {
-	var err error
 	p := &PlatformPaths{
 		AppName:     DefaultAppName,
 		ConfigPaths: DefaultConfigPaths,
 		ConfigTypes: DefaultConfigTypes,
 	}
 
-	p.lock.Lock()
-	g := new(errgroup.Group)
-	defer p.lock.Unlock()
-
-	// async work
-	g.Go(func() error {
-		err := p.configure()
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	// wait - return first err
-	err = g.Wait()
-	if err != nil {
+	if err := p.configure(); err != nil {
 		return nil, err
 	}
 
@@ -124,9 +106,6 @@ func DefaultPaths() (*PlatformPaths, error) {
 // the final Paths object. If no Options are applied the output will be akin to Default, except
 // for the Config... fields which are now set.
 func Paths(opts ...Opt) (*PlatformPaths, error) {
-	var err error
-	var wg sync.WaitGroup
-
 	// build and configure the Platform
 	p := &PlatformPaths{
 		AppName:     DefaultAppName,
@@ -140,36 +119,16 @@ func Paths(opts ...Opt) (*PlatformPaths, error) {
 		p.AppName = cases.Title(language.Und, cases.Compact).String(p.AppName)
 	}
 
-	// configure - non failable
-	wg.Add(len(opts))
 	for _, opt := range opts {
-		go func() {
-			opt(p)
-			wg.Done()
-		}()
+		opt(p)
 	}
-	wg.Wait() // wait for configuration to finish
 
-	g := new(errgroup.Group)
-	// async init
-	g.Go(func() error {
-		p.updateConfigPaths()
-		err := p.configure()
-		if err != nil {
-			return err
-		}
+	p.updateConfigPaths()
+	if err := p.configure(); err != nil {
+		return nil, err
+	}
 
-		err = p.findConfigFile()
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	// wait - return first err
-	err = g.Wait()
-	if err != nil {
+	if err := p.findConfigFile(); err != nil {
 		return nil, err
 	}
 
@@ -300,12 +259,12 @@ func (p *PlatformPaths) updateConfigPaths() {
 	defer p.lock.Unlock()
 
 	curPaths := p.ConfigPaths
-	new := helpers.RemoveDuplicates(append(curPaths, []string{
+	updated := helpers.RemoveDuplicates(append(curPaths, []string{
 		fmt.Sprintf("/etc/%s/%s.%s", p.AppName, p.AppName, p.ConfigTypes[0]),
 		fmt.Sprintf("./%s.%s", p.AppName, p.ConfigTypes[0]),
 	}...))
 
-	p.ConfigPaths = new
+	p.ConfigPaths = updated
 }
 
 // findConfigFile tries to find a configuration file within the specified ConfigPaths and

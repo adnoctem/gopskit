@@ -32,15 +32,9 @@ func New(path string, opts ...Opt) (*Database, error) {
 	}
 
 	// (re)-configure
-	var wg sync.WaitGroup
-	wg.Add(len(opts))
 	for _, opt := range opts {
-		go func() {
-			opt(db)
-			wg.Done()
-		}()
+		opt(db)
 	}
-	wg.Wait()
 
 	// create path if it does not exist
 	exists := fs.CheckIfExists(path)

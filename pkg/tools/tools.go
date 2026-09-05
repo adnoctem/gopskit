@@ -18,11 +18,11 @@ import (
 type Executable int
 
 const (
-	kubectl Executable = iota
-	helm
-	helmfile
-	stepCA
-	kustomize
+	Kubectl Executable = iota
+	Helm
+	Helmfile
+	StepCA
+	Kustomize
 )
 
 // String implements the fmt.Stringer interface for the new Executable type
@@ -37,7 +37,7 @@ func (e Executable) Index() int {
 
 var (
 	githubURL   = "https://github.com/"
-	executables = []Executable{kubectl, helm, helmfile, stepCA, kustomize}
+	executables = []Executable{Kubectl, Helm, Helmfile, StepCA, Kustomize}
 )
 
 // Find checks the system for the required executables. It returns the first error that occurs during

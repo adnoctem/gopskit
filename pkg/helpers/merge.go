@@ -47,13 +47,13 @@ func DeepMergeMap(dst, src map[string]interface{}) error {
 }
 
 const (
-	DELIMITER        string = "."
-	REPLACE_TEMPLATE string = "{{ .Values | get \"%s\" \"%v\" }}"
+	Delimiter       string = "."
+	ReplaceTemplate string = "{{ .Values | get \"%s\" \"%v\" }}"
 )
 
 var (
-	BumpValues    = []string{"annotation", "label", "securitycontext", "affinity"}
-	BumpTemlplate = `  {{- if index .Values "%s" "chartValues"  | get "%s" "" }}
+	BumpValues   = []string{"annotation", "label", "securitycontext", "affinity"}
+	BumpTemplate = `  {{- if index .Values "%s" "chartValues"  | get "%s" "" }}
   {{ with index .Values "%s" "chartValues" | get "%s" }}
   annotations:
   {{- toYaml . | nindent %d }}
@@ -65,7 +65,7 @@ var (
 // Relying on recursion until we hit a primitive is highly error prone.
 func ReplaceRecursive(input map[string]interface{}, keys []string, output map[string]interface{}, template string) {
 	if template == "" {
-		template = REPLACE_TEMPLATE
+		template = ReplaceTemplate
 	}
 
 	for k, v := range input {
@@ -83,7 +83,7 @@ func ReplaceRecursive(input map[string]interface{}, keys []string, output map[st
 		case map[string]interface{}:
 			// handle empty map
 			if len(cur) == 0 {
-				key := strings.Join(kp, DELIMITER)
+				key := strings.Join(kp, Delimiter)
 				// handle null values
 				value := v
 				if v == nil {
@@ -98,7 +98,7 @@ func ReplaceRecursive(input map[string]interface{}, keys []string, output map[st
 			mRef := output[k].(map[string]interface{})
 			ReplaceRecursive(cur, kp, mRef, template)
 		default:
-			key := strings.Join(kp, DELIMITER)
+			key := strings.Join(kp, Delimiter)
 			// handle null values
 			value := v
 			if v == nil {

@@ -94,7 +94,7 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 					Name: "longhorn-encrypted",
 				},
 				Provisioner:          "driver.longhorn.io",
-				AllowVolumeExpansion: helpers.BoolPtr(true),
+				AllowVolumeExpansion: helpers.Ptr(true),
 				Parameters: map[string]string{
 					"numberOfReplicas":    fmt.Sprintf("%d", encryptionReplicas),
 					"staleReplicaTimeout": fmt.Sprintf("%d", staleReplicaTimeout),

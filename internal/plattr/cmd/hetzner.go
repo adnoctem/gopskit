@@ -81,9 +81,9 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 					Name: "hcloud-encrypted-volumes",
 				},
 				Provisioner:          "csi.hetzner.cloud",
-				ReclaimPolicy:        (*corev1.PersistentVolumeReclaimPolicy)(helpers.StrPtr("Delete")),
-				VolumeBindingMode:    (*storagev1.VolumeBindingMode)(helpers.StrPtr("WaitForFirstConsumer")),
-				AllowVolumeExpansion: helpers.BoolPtr(true),
+				ReclaimPolicy:        helpers.Ptr(corev1.PersistentVolumeReclaimDelete),
+				VolumeBindingMode:    helpers.Ptr(storagev1.VolumeBindingWaitForFirstConsumer),
+				AllowVolumeExpansion: helpers.Ptr(true),
 				Parameters: map[string]string{
 					"csi.storage.k8s.io/node-publish-secret-name":      secret.Name,
 					"csi.storage.k8s.io/node-publish-secret-namespace": secret.Namespace,

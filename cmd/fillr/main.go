@@ -10,7 +10,7 @@ import (
 func main() {
 	kern, err := app.New()
 	if err != nil {
-		log.Fatalf("could not initialize %s: %v", kern.Name, err)
+		log.Fatalf("could not initialize %s: %v", app.Name, err)
 	}
 
 	cmdRoot := cmd.NewRootCommand(kern)

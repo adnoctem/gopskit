@@ -17,7 +17,7 @@ const Name = "fillr"
 // Opt is configuration option for the application State
 type Opt func(a *State)
 
-type CLIOpt func() func(a *State) *cobra.Command
+type CLIOpt func(a *State) *cobra.Command
 
 // State is the implementation for the `ssolo` command-line application state
 type State struct {
