@@ -31,7 +31,7 @@ jobs:
           # so they're excluded outright rather than disabling those linters repo-wide.
           # CHANGELOG.md is semantic-release-generated (excluded from our own markdownlint/typos
           # pre-commit hooks for the same reason - its per-version headings legitimately repeat).
-          FILTER_REGEX_EXCLUDE: (.*.mod|.*.sum|.*.lock|.*.?bazel.*|^CHANGELOG.md$)
+          FILTER_REGEX_EXCLUDE: (.*.mod|.*.sum|.*.lock|.*.?bazel.*|.*CHANGELOG.md$)
           BASH_EXEC_IGNORE_LIBRARIES: true
           # mostly false positives
           VALIDATE_NATURAL_LANGUAGE: false
