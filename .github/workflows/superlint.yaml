@@ -31,7 +31,11 @@ jobs:
           # so they're excluded outright rather than disabling those linters repo-wide.
           # CHANGELOG.md is semantic-release-generated (excluded from our own markdownlint/typos
           # pre-commit hooks for the same reason - its per-version headings legitimately repeat).
-          FILTER_REGEX_EXCLUDE: (.*.mod|.*.sum|.*.lock|.*.?bazel.*|.*CHANGELOG.md$)
+          # pkg/helm/testdata/testchart is a Go test fixture, not a real chart - generic
+          # YAML/Helm/IaC linters (checkov, trivy, yaml-prettier) have no business validating it,
+          # and yaml-prettier even flags its correct "{{ .Values.name }}" template syntax as
+          # malformed since it doesn't know Helm templates aren't plain YAML.
+          FILTER_REGEX_EXCLUDE: (.*.mod|.*.sum|.*.lock|.*.?bazel.*|.*CHANGELOG.md$|.*testdata/testchart/.*)
           BASH_EXEC_IGNORE_LIBRARIES: true
           # Trivy's own CLI flags can be set as env vars (TRIVY_<FLAG_NAME>). Per-vulnerability
           # ignores (with justification) live in the referenced file rather than a blanket
