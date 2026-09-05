@@ -23,6 +23,8 @@ them using [`fillr`][fillr]. Are you running your own custom private Certificate
 [Smallstep's CA][smallstep_certificates]? Then you'd likely want to generate and manage PKI values using
 [`steppa`][steppa]. The German KBA delivers data in a custom bespoke text-based format, which purely relies on columns
 to separate data. _That ain't SQL..._ So let's swiftly generate some usable SQL import script using [`amtrac`][amtrac].
+Managing high-stakes backbone components like Vault or Keycloak themselves with Helm? [`carto`][carto] renders,
+diffs, applies and rolls back charts using a deterministic base+overlay values-merge strategy.
 
 ## ✨ TL;DR
 
@@ -41,6 +43,7 @@ quick-reference list as an overview:
 - [`fillr`][fillr]: create Helmfile templates automatically
 - [`steppa`][steppa]: generate and manage SmallStep PKI values
 - [`amtrac`][amtrac]: generate SQL dumps from the German KBA's data files using Docker
+- [`carto`][carto]: manage Kubernetes backbone components (Helm charts) with the Helm SDK
 
 ### 🔃 Contributing
 
@@ -67,6 +70,7 @@ for more information. You may also use the linked contact details to reach out d
 [fillr]: cmd/fillr
 [steppa]: cmd/steppa
 [amtrac]: cmd/amtrac
+[carto]: cmd/carto
 
 <!-- File references -->
 

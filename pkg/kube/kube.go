@@ -58,8 +58,6 @@ func NewClient(opts ...Opt) (*Client, error) {
 		opt(kc)
 	}
 
-	kc.Flags = genericclioptions.NewConfigFlags(true)
-
 	// if WithConfigPath wasn't in the opts
 	if kc.ConfigPath == "" {
 		kc.ConfigPath, err = findKubeConfig()
@@ -71,6 +69,13 @@ func NewClient(opts ...Opt) (*Client, error) {
 	if kc.namespace == "" {
 		kc.namespace = DefaultNamespace
 	}
+
+	// keep Flags (used by consumers needing a genericclioptions.RESTClientGetter, e.g. the Helm
+	// SDK) resolving against the same kubeconfig/namespace as Config/Client above, instead of
+	// independently re-discovering its own defaults
+	kc.Flags = genericclioptions.NewConfigFlags(true)
+	kc.Flags.KubeConfig = &kc.ConfigPath
+	kc.Flags.Namespace = &kc.namespace
 
 	kc.Config, err = clientcmd.BuildConfigFromFlags("", kc.ConfigPath)
 	if err != nil {

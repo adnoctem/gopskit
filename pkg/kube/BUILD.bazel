@@ -9,6 +9,7 @@ go_library(
         "generic.go",
         "get.go",
         "kube.go",
+        "logs.go",
         "port_forward.go",
     ],
     importpath = "github.com/fmjstudios/gopskit/pkg/kube",
@@ -16,6 +17,7 @@ go_library(
     deps = [
         "//pkg/fsi",
         "//pkg/proc",
+        "@com_github_moby_term//:term",
         "@io_k8s_api//apps/v1:apps",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_api//networking/v1:networking",

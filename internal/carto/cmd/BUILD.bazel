@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "cmd",
+    srcs = [
+        "apply.go",
+        "cmd.go",
+        "diff.go",
+        "exec.go",
+        "history.go",
+        "logs.go",
+        "render.go",
+        "rollback.go",
+        "values.go",
+    ],
+    importpath = "github.com/fmjstudios/gopskit/internal/carto/cmd",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/carto/app",
+        "//internal/carto/config",
+        "//pkg/fsi",
+        "//pkg/helm",
+        "//pkg/proc",
+        "@com_github_olekukonko_tablewriter//:tablewriter",
+        "@com_github_spf13_cobra//:cobra",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":cmd",
+    visibility = ["//:__subpackages__"],
+)

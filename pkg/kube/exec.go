@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/moby/term"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -72,6 +73,68 @@ func (c *Client) Exec(command string, pod corev1.Pod) (string, string, error) {
 	}
 
 	return stdOut.String(), stdErr.String(), nil
+}
+
+// fixedSizeQueue reports a single, unchanging terminal size and then stops - it does not track
+// live resize events (SIGWINCH). Adding that is future work.
+type fixedSizeQueue struct {
+	size *remotecommand.TerminalSize
+	sent bool
+}
+
+// Next implements remotecommand.TerminalSizeQueue for fixedSizeQueue
+func (q *fixedSizeQueue) Next() *remotecommand.TerminalSize {
+	if q.sent {
+		return nil
+	}
+
+	q.sent = true
+	return q.size
+}
+
+// ExecTTY executes an interactive command within the given container of pod, attaching the
+// current process's stdin/stdout/stderr with a TTY and reporting the initial terminal size to the
+// remote side.
+func (c *Client) ExecTTY(pod corev1.Pod, container string, command []string) error {
+	stdIn, stdOut, stdErr := term.StdStreams()
+
+	req := c.Client.CoreV1().
+		RESTClient().
+		Post().
+		Resource("pods").
+		Name(pod.Name).
+		Namespace(pod.Namespace).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: container,
+			Command:   command,
+			Stdin:     true,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       true,
+		}, scheme.ParameterCodec)
+
+	exec, err := createExecutor(req.URL(), c.Config)
+	if err != nil {
+		return err
+	}
+
+	var sizeQueue remotecommand.TerminalSizeQueue
+	if fd, isTerminal := term.GetFdInfo(stdIn); isTerminal {
+		if ws, err := term.GetWinsize(fd); err == nil {
+			sizeQueue = &fixedSizeQueue{
+				size: &remotecommand.TerminalSize{Width: ws.Width, Height: ws.Height},
+			}
+		}
+	}
+
+	return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+		Stdin:             stdIn,
+		Stdout:            stdOut,
+		Stderr:            stdErr,
+		Tty:               true,
+		TerminalSizeQueue: sizeQueue,
+	})
 }
 
 // createExecutor creates a Kubernetes remote Executor for use with the Exec client methods. The function is scoped
