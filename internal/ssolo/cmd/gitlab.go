@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 	"github.com/fmjstudios/gopskit/internal/ssolo/app"
 	"github.com/spf13/cobra"
 )

@@ -15,8 +15,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/fsi",
+        "@cat_dario_mergo//:mergo",
         "@com_github_google_go_cmp//cmp",
-        "@com_github_imdario_mergo//:mergo",
         "@in_gopkg_yaml_v3//:yaml_v3",
         "@io_k8s_cli_runtime//pkg/genericclioptions",
         "@io_k8s_utils//diff",

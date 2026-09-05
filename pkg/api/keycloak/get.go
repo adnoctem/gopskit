@@ -3,7 +3,7 @@ package keycloak
 import (
 	"context"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 )
 
 func (kc *Client) Realms() ([]*gocloak.RealmRepresentation, error) {

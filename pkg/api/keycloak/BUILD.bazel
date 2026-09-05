@@ -17,7 +17,7 @@ go_library(
         "//pkg/fsi",
         "//pkg/helpers",
         "//pkg/log",
-        "@com_github_nerzal_gocloak_v13//:gocloak",
+        "@com_github_nerzal_gocloak_v14//:gocloak",
         "@org_golang_x_text//cases",
         "@org_golang_x_text//language",
     ],

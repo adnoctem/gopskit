@@ -3,9 +3,9 @@ package helm
 import (
 	"fmt"
 
+	"dario.cat/mergo"
 	fs "github.com/fmjstudios/gopskit/pkg/fsi"
 	"github.com/google/go-cmp/cmp"
-	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 )
 

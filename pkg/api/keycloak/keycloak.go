@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 	"github.com/fmjstudios/gopskit/pkg/api"
 	fs "github.com/fmjstudios/gopskit/pkg/fsi"
 	"github.com/fmjstudios/gopskit/pkg/helpers"

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 	"github.com/fmjstudios/gopskit/internal/ssolo/app"
 	"github.com/fmjstudios/gopskit/pkg/api/keycloak"
 	"github.com/fmjstudios/gopskit/pkg/kube/kubeutil"

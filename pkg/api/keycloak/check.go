@@ -1,7 +1,7 @@
 package keycloak
 
 import (
-	"github.com/Nerzal/gocloak/v13"
+	"github.com/Nerzal/gocloak/v14"
 )
 
 func (kc *Client) RealmExists(name string) (bool, error) {

@@ -14,7 +14,7 @@ go_library(
         "//pkg/api/keycloak",
         "//pkg/kube/kubeutil",
         "//pkg/proc",
-        "@com_github_nerzal_gocloak_v13//:gocloak",
+        "@com_github_nerzal_gocloak_v14//:gocloak",
         "@com_github_spf13_cobra//:cobra",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
