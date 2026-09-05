@@ -1,8 +1,8 @@
-"""gopskit is a custom toolkit centered around the FMJ Studios Operations Kubernetes Cluster"""
+"""gopskit is a custom toolkit centered around the Ad Noctem Collective Operations Kubernetes Cluster"""
 
 module(
     name = "gopskit",
-    repo_name = "com_github_fmjstudios_gopskit",
+    repo_name = "com_github_adnoctem_gopskit",
 )
 
 bazel_dep(name = "rules_go", version = "0.63.0", repo_name = "io_bazel_rules_go")
@@ -33,6 +33,7 @@ use_repo(
     "io_k8s_apimachinery",
     "io_k8s_cli_runtime",
     "io_k8s_client_go",
+    "io_k8s_streaming",
     "io_k8s_utils",
     "org_golang_x_mod",
     "org_golang_x_text",

@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fmjstudios/gopskit/internal/ssolo/app"
-	"github.com/fmjstudios/gopskit/internal/ssolo/cmd"
-	_ "github.com/fmjstudios/gopskit/pkg/stamp"
+	"github.com/adnoctem/gopskit/internal/ssolo/app"
+	"github.com/adnoctem/gopskit/internal/ssolo/cmd"
+	_ "github.com/adnoctem/gopskit/pkg/stamp"
 )
 
 func main() {

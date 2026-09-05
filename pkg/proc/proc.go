@@ -55,7 +55,9 @@ func NewExecutor(opts ...Opt) (*Executor, error) {
 
 	// (re)-configure
 	for _, o := range opts {
-		o(e)
+		if err := o(e); err != nil {
+			return nil, err
+		}
 	}
 
 	return e, nil
@@ -228,7 +230,7 @@ func copyBytes(src io.Reader, dst io.Writer) ([]byte, error) {
 	var out []byte
 	buf := make([]byte, 1024)
 	for {
-		n, err := src.Read(buf[:])
+		n, err := src.Read(buf)
 		if n > 0 {
 			d := buf[:n]
 			out = append(out, d...)

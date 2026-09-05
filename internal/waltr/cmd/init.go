@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/fmjstudios/gopskit/internal/waltr/app"
-	cmdutil "github.com/fmjstudios/gopskit/internal/waltr/util"
-	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
-	"github.com/fmjstudios/gopskit/pkg/core"
-	"github.com/fmjstudios/gopskit/pkg/proc"
-	"github.com/fmjstudios/gopskit/pkg/tools"
+	"github.com/adnoctem/gopskit/internal/waltr/app"
+	cmdutil "github.com/adnoctem/gopskit/internal/waltr/util"
+	apivault "github.com/adnoctem/gopskit/pkg/api/vault"
+	"github.com/adnoctem/gopskit/pkg/core"
+	"github.com/adnoctem/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/pkg/tools"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/hashicorp/vault-client-go/schema"
@@ -68,7 +68,7 @@ func NewInitCommand(app *app.State) *cobra.Command {
 				for _, vol := range p.Spec.Volumes {
 					if vol.Name == "config" {
 						hasCustomConfig = true
-						customConfigName = vol.ConfigMap.LocalObjectReference.Name
+						customConfigName = vol.ConfigMap.Name
 						break
 					}
 				}

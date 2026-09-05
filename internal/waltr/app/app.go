@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"time"
 
-	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
-	"github.com/fmjstudios/gopskit/pkg/core"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
-	"github.com/fmjstudios/gopskit/pkg/log"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	apivault "github.com/adnoctem/gopskit/pkg/api/vault"
+	"github.com/adnoctem/gopskit/pkg/core"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
+	"github.com/adnoctem/gopskit/pkg/log"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 
-	"github.com/fmjstudios/gopskit/pkg/kube"
-	"github.com/fmjstudios/gopskit/pkg/stamp"
+	"github.com/adnoctem/gopskit/pkg/kube"
+	"github.com/adnoctem/gopskit/pkg/stamp"
 )
 
 const (

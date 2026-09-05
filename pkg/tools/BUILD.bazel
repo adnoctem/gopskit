@@ -7,7 +7,7 @@ go_library(
         "smallstep.go",
         "tools.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/tools",
+    importpath = "github.com/adnoctem/gopskit/pkg/tools",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/fsi",

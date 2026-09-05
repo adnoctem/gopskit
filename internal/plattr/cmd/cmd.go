@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/fmjstudios/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/internal/plattr/app"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func NewRootCommand(plattr *app.State) *cobra.Command {
 		SilenceErrors:    true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Usage()
+				return cmd.Usage()
 			}
 
 			return nil
@@ -50,10 +50,6 @@ func NewRootCommand(plattr *app.State) *cobra.Command {
 		},
 		SilenceUsage: true,
 	}
-
-	// Kubernetes Flags
-	//a.KubeClient.Flags.Namespace = util.StrPtr(app.DefaultNamespace)
-	//a.KubeClient.Flags.AddFlags(cmd.PersistentFlags())
 
 	cmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", app.DefaultNamespace, "The Kubernetes namespace to use. None equates to checking the entire cluster.")
 	cmd.PersistentFlags().BoolVar(&reflect, "reflect", false, "Enable reflection for the created resources via Reflector.")

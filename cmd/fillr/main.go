@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/fmjstudios/gopskit/internal/fillr/app"
-	"github.com/fmjstudios/gopskit/internal/fillr/cmd"
-	_ "github.com/fmjstudios/gopskit/pkg/stamp"
 	"log"
+
+	"github.com/adnoctem/gopskit/internal/fillr/app"
+	"github.com/adnoctem/gopskit/internal/fillr/cmd"
+	_ "github.com/adnoctem/gopskit/pkg/stamp"
 )
 
 func main() {

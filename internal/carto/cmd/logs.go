@@ -6,9 +6,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/fmjstudios/gopskit/internal/carto/app"
-	"github.com/fmjstudios/gopskit/internal/carto/config"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/carto/app"
+	"github.com/adnoctem/gopskit/internal/carto/config"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -53,7 +53,7 @@ func NewLogsCommand(a *app.State) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("could not stream logs for pod %q: %w", pod.Name, err)
 			}
-			defer stream.Close()
+			defer func() { _ = stream.Close() }()
 
 			_, err = io.Copy(os.Stdout, bufio.NewReader(stream))
 			return err

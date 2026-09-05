@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "app",
     srcs = ["app.go"],
-    importpath = "github.com/fmjstudios/gopskit/internal/ssolo/app",
+    importpath = "github.com/adnoctem/gopskit/internal/ssolo/app",
     visibility = ["//:__subpackages__"],
     deps = [
         "//pkg/api/keycloak",

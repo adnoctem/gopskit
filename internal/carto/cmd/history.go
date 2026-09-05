@@ -5,9 +5,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/fmjstudios/gopskit/internal/carto/app"
-	"github.com/fmjstudios/gopskit/internal/carto/config"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/carto/app"
+	"github.com/adnoctem/gopskit/internal/carto/config"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -50,13 +50,15 @@ func NewHistoryCommand(a *app.State) *cobra.Command {
 			table := tablewriter.NewWriter(os.Stdout)
 			table.Header("REVISION", "STATUS", "CHART", "APP VERSION", "DESCRIPTION")
 			for _, rel := range releases {
-				table.Append(
+				if err := table.Append(
 					strconv.Itoa(rel.Version),
 					rel.Info.Status.String(),
 					fmt.Sprintf("%s-%s", rel.Chart.Metadata.Name, rel.Chart.Metadata.Version),
 					rel.Chart.Metadata.AppVersion,
 					rel.Info.Description,
-				)
+				); err != nil {
+					return err
+				}
 			}
 
 			return table.Render()

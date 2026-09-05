@@ -8,8 +8,9 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/fmjstudios/gopskit/pkg/proc"
 	"strings"
+
+	"github.com/adnoctem/gopskit/pkg/proc"
 
 	"github.com/go-resty/resty/v2"
 )

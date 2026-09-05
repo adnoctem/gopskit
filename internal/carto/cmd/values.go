@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/fmjstudios/gopskit/internal/carto/config"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
-	apihelm "github.com/fmjstudios/gopskit/pkg/helm"
+	"github.com/adnoctem/gopskit/internal/carto/config"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
+	apihelm "github.com/adnoctem/gopskit/pkg/helm"
 )
 
 // DefaultChartsDir is the default directory carto looks in for per-chart values files

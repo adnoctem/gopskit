@@ -1,4 +1,4 @@
-# FMJ Studios - `gopskit` Repository Contributing Guidelines
+# Ad Noctem Collective - `gopskit` Repository Contributing Guidelines
 
 This file is currently a `WIP`. Please check back later for more information or open an [issue][issues] for help.
 
@@ -6,4 +6,4 @@ This file is currently a `WIP`. Please check back later for more information or 
 
 <!-- General links -->
 
-[issues]: https://github.com/fmjstudios/gopskit/issues
+[issues]: https://github.com/adnoctem/gopskit/issues

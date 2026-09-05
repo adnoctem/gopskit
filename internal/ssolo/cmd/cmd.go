@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/fmjstudios/gopskit/internal/ssolo/app"
+	"github.com/adnoctem/gopskit/internal/ssolo/app"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ func NewRootCommand(ssolo *app.State) *cobra.Command {
 		SilenceErrors:    true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Usage()
+				return cmd.Usage()
 			}
 
 			return nil
@@ -38,10 +38,6 @@ func NewRootCommand(ssolo *app.State) *cobra.Command {
 			HiddenDefaultCmd: true,
 		},
 	}
-
-	// All Kubernetes Flags
-	//a.KubeClient.Flags.Namespace = util.StrPtr(app.DefaultNamespace)
-	//a.KubeClient.Flags.AddFlags(cmd.PersistentFlags())
 
 	addKubernetesFlags(cmd, &label, &namespace)
 

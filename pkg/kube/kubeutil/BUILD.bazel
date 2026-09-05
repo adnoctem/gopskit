@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "kubeutil",
     srcs = ["kubeutil.go"],
-    importpath = "github.com/fmjstudios/gopskit/pkg/kube/kubeutil",
+    importpath = "github.com/adnoctem/gopskit/pkg/kube/kubeutil",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/helpers",

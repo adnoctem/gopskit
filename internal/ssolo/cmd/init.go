@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/Nerzal/gocloak/v14"
-	"github.com/fmjstudios/gopskit/internal/ssolo/app"
-	"github.com/fmjstudios/gopskit/pkg/api/keycloak"
-	"github.com/fmjstudios/gopskit/pkg/kube/kubeutil"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/ssolo/app"
+	"github.com/adnoctem/gopskit/pkg/api/keycloak"
+	"github.com/adnoctem/gopskit/pkg/kube/kubeutil"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,7 +82,7 @@ func NewInitCommand(app *app.State) *cobra.Command {
 			}
 
 			// wait until the pod is running
-			// TODO(FMJdev): make the latter label configurable
+			// TODO(MVProwess): make the latter label configurable
 			leaderPod, err = kubeutil.LeaderPod(app.Kube, podNamespace, label, "apps.kubernetes.io/pod-index=0")
 			if err != nil {
 				return err

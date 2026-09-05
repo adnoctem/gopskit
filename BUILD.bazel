@@ -1,7 +1,7 @@
 # taken from: https://github.com/jankremlacek/go-bazel/blob/main/BUILD.bazel
 load("@bazel_gazelle//:def.bzl", "gazelle")
 
-# gazelle:prefix github.com/fmjstudios/gopskit
+# gazelle:prefix github.com/adnoctem/gopskit
 gazelle(name = "gazelle")
 
 # make sure that others can import either using the import or go_default_library naming conventions

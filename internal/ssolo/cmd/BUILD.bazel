@@ -7,7 +7,7 @@ go_library(
         "gitlab.go",
         "init.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/internal/ssolo/cmd",
+    importpath = "github.com/adnoctem/gopskit/internal/ssolo/cmd",
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/ssolo/app",

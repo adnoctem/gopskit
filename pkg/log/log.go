@@ -80,11 +80,10 @@ func New(opts ...Option) *Logger {
 	}
 
 	l.lock.Lock()
-	defer l.lock.Unlock()
-
 	for _, opt := range opts {
 		opt(l)
 	}
+	l.lock.Unlock()
 
 	lgr, err := l.conf.Build()
 	if err != nil {

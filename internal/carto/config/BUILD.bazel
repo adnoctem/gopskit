@@ -6,7 +6,7 @@ go_library(
         "config.go",
         "hooks.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/internal/carto/config",
+    importpath = "github.com/adnoctem/gopskit/internal/carto/config",
     visibility = ["//:__subpackages__"],
     deps = [
         "//pkg/fsi",

@@ -3,8 +3,9 @@ package kv
 import (
 	"context"
 	"fmt"
-	"github.com/dgraph-io/badger/v4"
 	"sync"
+
+	"github.com/dgraph-io/badger/v4"
 )
 
 const (

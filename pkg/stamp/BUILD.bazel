@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "stamp",
     srcs = ["stamp.go"],
-    importpath = "github.com/fmjstudios/gopskit/pkg/stamp",
+    importpath = "github.com/adnoctem/gopskit/pkg/stamp",
     visibility = ["//visibility:public"],
 )
 

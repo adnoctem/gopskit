@@ -65,7 +65,7 @@ func Read(path string) ([]byte, error) {
 }
 
 func WriteFile(file *os.File, content []byte) error {
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	abs, err := filepath.Abs(file.Name())
 	if err != nil {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
+	"github.com/adnoctem/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/go-resty/resty/v2"
 	"github.com/vmware-labs/yaml-jsonpath/pkg/yamlpath"
 	"golang.org/x/mod/semver"

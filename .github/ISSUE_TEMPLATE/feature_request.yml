@@ -1,4 +1,4 @@
-# Copyright FMJ Studios
+# Copyright Ad Noctem Collective
 # SPDX-License-Identifier: MIT
 
 name: "\U0001F680 Feature request"
@@ -8,7 +8,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for suggesting an idea to improve FMJ Studios Go Operations toolkit.
+        Thank you for suggesting an idea to improve Ad Noctem Collective Go Operations toolkit.
         Please fill in as much of the following form as you're able.
   - type: input
     attributes:

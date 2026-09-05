@@ -14,7 +14,7 @@ go_library(
         "longhorn.go",
         "nginx.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/internal/plattr/cmd",
+    importpath = "github.com/adnoctem/gopskit/internal/plattr/cmd",
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/plattr/app",

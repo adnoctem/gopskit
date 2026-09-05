@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
 )
 
 func LoadX509KeyPair(cert, key string) (tls.Certificate, error) {

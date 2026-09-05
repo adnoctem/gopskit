@@ -13,7 +13,7 @@ go_library(
         "rollback.go",
         "values.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/internal/carto/cmd",
+    importpath = "github.com/adnoctem/gopskit/internal/carto/cmd",
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/carto/app",

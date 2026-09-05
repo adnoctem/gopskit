@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/fmjstudios/gopskit/internal/carto/app"
+	"github.com/adnoctem/gopskit/internal/carto/app"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +35,7 @@ func NewRootCommand(carto *app.State) *cobra.Command {
 		SilenceErrors:    true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Usage()
+				return cmd.Usage()
 			}
 
 			return nil

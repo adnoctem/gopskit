@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fmjstudios/gopskit/internal/waltr/app"
-	"github.com/fmjstudios/gopskit/internal/waltr/cmd"
-	_ "github.com/fmjstudios/gopskit/pkg/stamp"
+	"github.com/adnoctem/gopskit/internal/waltr/app"
+	"github.com/adnoctem/gopskit/internal/waltr/cmd"
+	_ "github.com/adnoctem/gopskit/pkg/stamp"
 )
 
 func main() {

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/fmjstudios/gopskit/internal/waltr/app"
-	"github.com/fmjstudios/gopskit/internal/waltr/util"
-	apivault "github.com/fmjstudios/gopskit/pkg/api/vault"
-	"github.com/fmjstudios/gopskit/pkg/core"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/waltr/app"
+	"github.com/adnoctem/gopskit/internal/waltr/util"
+	apivault "github.com/adnoctem/gopskit/pkg/api/vault"
+	"github.com/adnoctem/gopskit/pkg/core"
+	"github.com/adnoctem/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 )
 

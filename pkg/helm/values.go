@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"dario.cat/mergo"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
 	"github.com/google/go-cmp/cmp"
 	"gopkg.in/yaml.v3"
 )

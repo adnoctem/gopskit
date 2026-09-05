@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/fmjstudios/gopskit/pkg/api"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
-	"github.com/fmjstudios/gopskit/pkg/log"
+	"github.com/adnoctem/gopskit/pkg/api"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
+	"github.com/adnoctem/gopskit/pkg/log"
 	vault "github.com/hashicorp/vault-client-go"
 )
 

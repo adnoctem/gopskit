@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Nerzal/gocloak/v14"
-	"github.com/fmjstudios/gopskit/internal/ssolo/app"
+	"github.com/adnoctem/gopskit/internal/ssolo/app"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +55,7 @@ func NewGitLabCommand(ssolo *app.State) *cobra.Command {
 				ssolo.Log.Infof("skipping creation of Keycloak realm: %s. Realm already exists.", operationsRealm)
 			}
 
-			// TODO(FMJdev): register GitLab as a SAML client (protocol mappers, IdP-initiated SSO,
+			// TODO(MVProwess): register GitLab as a SAML client (protocol mappers, IdP-initiated SSO,
 			// GitLab-specific SAML attributes) and provision the Ingress-Nginx Diffie-Hellman
 			// parameter Secret this command used to stub out. Neither was ever actually
 			// implemented, even before this client rewrite - both are net-new feature work.

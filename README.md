@@ -1,11 +1,18 @@
-# Go Operations Toolkit <img src="https://github.com/fmjstudios/artwork/blob/5f7696fd09584e4d34d2ab0de3eb52b86037d924/projects/gopskit/icon/color/gopskit-icon-color.png?raw=true" alt="GOpsKit Logo" align="right" width="225"/>
+<p align="center">
+    <!-- Go Operations Toolkit -->
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/adnoctem/artwork/blob/4a43cf6856b3d5d98998c215bc09252c060e56ba/projects/gopskit/icon/white/gopskit-icon-white.png?raw=true">
+      <img src="https://github.com/adnoctem/artwork/blob/4a43cf6856b3d5d98998c215bc09252c060e56ba/projects/gopskit/icon/color/gopskit-icon-color.png?raw=true" alt="GOpsKit Logo" width="225">
+    </picture>
+    <h1 align="center">Go Operations Toolkit</h1>
+</p>
 
-[![License](https://img.shields.io/github/license/fmjstudios/gopskit?label=License)][license]
-[![go.mod version](https://img.shields.io/github/go-mod/go-version/fmjstudios/gopskit?logo=go)][go]
-[![Language](https://img.shields.io/github/languages/top/fmjstudios/gopskit?label=Go&logo=go)][go]
-[![Testing](https://github.com/fmjstudios/gopskit/actions/workflows/testing.yaml/badge.svg)][ci_testing_workflow]
-[![GitHub Release](https://img.shields.io/github/v/release/fmjstudios/gopskit?label=Release)][github_releases]
-[![GitHub Activity](https://img.shields.io/github/commit-activity/m/fmjstudios/gopskit?label=Commits)][github_commits]
+[![License](https://img.shields.io/github/license/adnoctem/gopskit?label=License)][license]
+[![go.mod version](https://img.shields.io/github/go-mod/go-version/adnoctem/gopskit?logo=go)][go]
+[![Language](https://img.shields.io/github/languages/top/adnoctem/gopskit?label=Go&logo=go)][go]
+[![Testing](https://github.com/adnoctem/gopskit/actions/workflows/testing.yaml/badge.svg)][ci_testing_workflow]
+[![GitHub Release](https://img.shields.io/github/v/release/adnoctem/gopskit?label=Release)][github_releases]
+[![GitHub Activity](https://img.shields.io/github/commit-activity/m/adnoctem/gopskit?label=Commits)][github_commits]
 [![Bazel](https://img.shields.io/badge/Bazel-built-brightgreen?logo=bazel&logoColor=43A047)][bazel]
 [![Renovate](https://img.shields.io/badge/Renovate-enabled-brightgreen?logo=renovate&logoColor=1A1F6C)][renovate]
 [![PreCommit](https://img.shields.io/badge/PreCommit-enabled-brightgreen?logo=precommit&logoColor=FAB040)][precommit]
@@ -52,13 +59,13 @@ formats and versioning tips.
 
 ### 📥 Maintainers
 
-This project is owned and maintained by [FMJ Studios][org] refer to the [`AUTHORS`][authors] or [`CODEOWNERS`][owners]
+This project is owned and maintained by [Ad Noctem Collective][org] refer to the [`AUTHORS`][authors] or [`CODEOWNERS`][owners]
 for more information. You may also use the linked contact details to reach out directly.
 
 ### ©️ Copyright
 
 - _Assets provided by:_ **[IconScout](https://iconscout.com)**
-- _Sources provided by:_ **[FMJ Studios][org]** under the **[MIT License][license]**
+- _Sources provided by:_ **[Ad Noctem Collective][org]** under the **[MIT License][license]**
 
 <!-- INTERNAL REFERENCES -->
 
@@ -78,11 +85,11 @@ for more information. You may also use the linked contact details to reach out d
 [contributing]: docs/CONTRIBUTING.md
 [authors]: .github/AUTHORS
 [owners]: .github/CODEOWNERS
-[ci_testing_workflow]: https://github.com/fmjstudios/gopskit/actions/workflows/testing.yaml
+[ci_testing_workflow]: https://github.com/adnoctem/gopskit/actions/workflows/testing.yaml
 
 <!-- General links -->
 
-[org]: https://github.com/fmjstudios
+[org]: https://github.com/adnoctem
 [kubernetes]: https://kubernetes.io
 [vault]: https://vaultproject.io
 [keycloak]: https://www.keycloak.org/
@@ -91,8 +98,8 @@ for more information. You may also use the linked contact details to reach out d
 [gazelle]: https://github.com/bazelbuild/bazel-gazelle
 [helmfile]: https://github.com/helmfile/helmfile
 [smallstep_certificates]: https://github.com/smallstep/certificates
-[github_releases]: https://github.com/fmjstudios/gopskit/releases
-[github_commits]: https://github.com/fmjstudios/gopskit/commits/main/
+[github_releases]: https://github.com/adnoctem/gopskit/releases
+[github_commits]: https://github.com/adnoctem/gopskit/commits/main/
 
 <!-- Third-party -->
 

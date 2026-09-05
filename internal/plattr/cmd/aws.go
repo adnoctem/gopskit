@@ -4,8 +4,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/fmjstudios/gopskit/internal/plattr/app"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +27,7 @@ func NewAWSCommand(app *app.State) *cobra.Command {
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var annotations = make(map[string]string)
-			var exists bool = true
+			var exists = true
 
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
@@ -72,7 +72,9 @@ func NewAWSCommand(app *app.State) *cobra.Command {
 				return nil
 			}
 
-			app.Kube.CreateSecret(secret.Namespace, secret, metav1.CreateOptions{})
+			if err := app.Kube.CreateSecret(secret.Namespace, secret, metav1.CreateOptions{}); err != nil {
+				return err
+			}
 			app.Log.Infof("Successfully created secret: %s in namespace: %s", secret.Name, secret.Namespace)
 			return nil
 		},

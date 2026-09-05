@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "env",
     srcs = ["env.go"],
-    importpath = "github.com/fmjstudios/gopskit/pkg/env",
+    importpath = "github.com/adnoctem/gopskit/pkg/env",
     visibility = ["//visibility:public"],
 )
 
@@ -19,7 +19,7 @@ go_library(
         "api.go",
         "env.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/core",
+    importpath = "github.com/adnoctem/gopskit/pkg/core",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/fsi",

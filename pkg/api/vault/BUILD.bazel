@@ -8,7 +8,7 @@ go_library(
         "system.go",
         "vault.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/api/vault",
+    importpath = "github.com/adnoctem/gopskit/pkg/api/vault",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api",

@@ -6,17 +6,17 @@ import (
 	"os"
 	"path/filepath"
 
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
+	"github.com/adnoctem/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	SmallstepDefaultName           = "FMJ Studios Private Certificate Authority"
-	SmallstepDefaultHostname       = "ca.fmj.studio"
+	SmallstepDefaultName           = "Ad Noctem Collective Private Certificate Authority"
+	SmallstepDefaultHostname       = "ca.mvprowess.com"
 	SmallstepDefaultAddress        = "0.0.0.0:443"
-	SmallstepDefaultProvisioner    = "info@fmj.studio"
+	SmallstepDefaultProvisioner    = "info@mvprowess.com"
 	SmallstepDefaultDeploymentType = "standalone"
 )
 

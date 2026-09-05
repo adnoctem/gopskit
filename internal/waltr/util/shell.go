@@ -1,9 +1,10 @@
 package util
 
 import (
-	"github.com/fmjstudios/gopskit/internal/waltr/app"
-	v1 "k8s.io/api/core/v1"
 	"strings"
+
+	"github.com/adnoctem/gopskit/internal/waltr/app"
+	v1 "k8s.io/api/core/v1"
 )
 
 // DisableAshHistory does what it says...

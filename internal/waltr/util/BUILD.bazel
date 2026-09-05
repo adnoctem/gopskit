@@ -6,7 +6,7 @@ go_library(
         "shell.go",
         "vault.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/internal/waltr/util",
+    importpath = "github.com/adnoctem/gopskit/internal/waltr/util",
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/waltr/app",

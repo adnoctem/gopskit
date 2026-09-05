@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -105,7 +105,7 @@ func WithNamespace(namespace string) func(c *Client) {
 	}
 }
 
-// TODO(FMJdev): evaluate validation of the found file path
+// TODO(MVProwess): evaluate validation of the found file path
 //
 // findKubeConfig searches the filesystem for possible locations of a KubeConfig file, which is most commonly
 // located at "$HOME/.kube/config". In addition to the aforementioned path we add "$HOME/.config/gopskit/kubeconfig" as

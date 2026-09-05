@@ -10,17 +10,11 @@ import (
 
 	"github.com/moby/term"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/streaming/pkg/httpstream"
 )
-
-//type ExecOptions struct {
-//	PodName   string
-//	Container string
-//	Namespace string
-//}
 
 // RemoteExecutor defines the interface accepted by the Exec command - provided for test stubbing
 type RemoteExecutor interface {
@@ -144,7 +138,7 @@ func (c *Client) ExecTTY(pod corev1.Pod, container string, command []string) err
 // NOTE: This function is largely analogous to the implementation within the `kubectl exec` command
 // ref: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/kubectl/pkg/cmd/exec/exec.go#L138
 func createExecutor(url *url.URL, config *rest.Config) (remotecommand.Executor, error) {
-	var exec remotecommand.Executor = nil
+	var exec remotecommand.Executor
 	var err error
 
 	// Fallback executor is default, unless feature flag is explicitly disabled.

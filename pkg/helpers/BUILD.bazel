@@ -9,7 +9,7 @@ go_library(
         "primitives.go",
         "slices.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/helpers",
+    importpath = "github.com/adnoctem/gopskit/pkg/helpers",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proc",

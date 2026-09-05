@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/Nerzal/gocloak/v14"
-	"github.com/fmjstudios/gopskit/pkg/api"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"github.com/fmjstudios/gopskit/pkg/log"
+	"github.com/adnoctem/gopskit/pkg/api"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
+	"github.com/adnoctem/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/pkg/log"
 )
 
 const (
@@ -264,20 +264,17 @@ func (kc *Client) Login() error {
 		kc.auth.Created = time.Now()
 	}
 
-	kc.auth.Save()
-	return nil
+	return kc.auth.Save()
 }
 
 func (kc *Client) Refresh() error {
 	var err error
 	ctx := context.Background()
 
-	// try to load old credentials
-	err = kc.auth.Load()
-	if err != nil {
-		if errors.Is(err, ErrAuthPathNotFound) {
-			err = nil
-		}
+	// try to load old credentials; a missing file is fine (first ever refresh), anything else
+	// is a real problem worth surfacing rather than proceeding with stale/empty auth
+	if err := kc.auth.Load(); err != nil && !errors.Is(err, ErrAuthPathNotFound) {
+		return err
 	}
 
 	if kc.auth.login == AdminCLILogin && helpers.EmptyStrings(kc.auth.username, kc.auth.password) {
@@ -288,8 +285,8 @@ func (kc *Client) Refresh() error {
 		return ErrClientAuthUnset
 	}
 
-	switch {
-	case kc.auth.login == AdminCLILogin:
+	switch kc.auth.login {
+	case AdminCLILogin:
 		{
 			kc.auth.JWT, err = kc.api.RefreshToken(ctx, kc.auth.JWT.RefreshToken, "admin-cli", "", kc.realm)
 			if err != nil {
@@ -299,7 +296,7 @@ func (kc *Client) Refresh() error {
 			kc.auth.Created = time.Now()
 		}
 
-	case kc.auth.login == ClientLogin:
+	case ClientLogin:
 		{
 			kc.auth.JWT, err = kc.api.RefreshToken(ctx, kc.auth.JWT.RefreshToken, kc.auth.clientId, kc.auth.clientSecret, kc.realm)
 			if err != nil {
@@ -310,8 +307,7 @@ func (kc *Client) Refresh() error {
 		}
 	}
 
-	kc.auth.Save()
-	return nil
+	return kc.auth.Save()
 }
 
 // -----------
@@ -399,10 +395,10 @@ func (kc *Client) Valid() bool {
 // -----------
 
 func LoginFromArg(arg string) (login, error) {
-	switch {
-	case arg == "admin-cli":
+	switch arg {
+	case "admin-cli":
 		return AdminCLILogin, nil
-	case arg == "client":
+	case "client":
 		return ClientLogin, nil
 	default:
 		return AdminCLILogin, fmt.Errorf("invalid login: %s", arg)

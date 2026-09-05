@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fmjstudios/gopskit/internal/plattr/app"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -35,7 +35,7 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var annotations = make(map[string]string)
-			var secretExists, storageClassExists bool = true, true // assume true to avoid creations
+			var secretExists, storageClassExists = true, true // assume true to avoid creations
 
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
@@ -134,7 +134,9 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 				return nil
 			}
 
-			app.Kube.CreateStorageClass(storageClass, metav1.CreateOptions{})
+			if err := app.Kube.CreateStorageClass(storageClass, metav1.CreateOptions{}); err != nil {
+				return err
+			}
 			app.Log.Infof("Successfully created Longhorn Volume Encryption StorageClass: %s", storageClass.Name)
 			return nil
 		},

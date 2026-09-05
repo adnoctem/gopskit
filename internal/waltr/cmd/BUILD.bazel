@@ -12,7 +12,7 @@ go_library(
         "prepare_keycloak.go",
         "transit.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/internal/waltr/cmd",
+    importpath = "github.com/adnoctem/gopskit/internal/waltr/cmd",
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/waltr/app",

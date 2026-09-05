@@ -11,7 +11,7 @@ go_library(
         "rollback.go",
         "values.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/helm",
+    importpath = "github.com/adnoctem/gopskit/pkg/helm",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/fsi",

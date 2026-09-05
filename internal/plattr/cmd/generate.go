@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/fmjstudios/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/internal/plattr/app"
 	"github.com/spf13/cobra"
 )
 

@@ -7,9 +7,13 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream"
+
+	// client-go's portforward.NewOnAddresses/NewFallbackDialer/NewSPDYOverWebsocketDialer still
+	// require this exact type as of client-go v0.36.2, not the newer k8s.io/streaming package -
+	// keeping this import is the only way to satisfy their signatures.
+	"k8s.io/apimachinery/pkg/util/httpstream" //nolint:staticcheck
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"

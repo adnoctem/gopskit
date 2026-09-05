@@ -3,9 +3,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/fmjstudios/gopskit/internal/carto/app"
-	"github.com/fmjstudios/gopskit/internal/carto/config"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/carto/app"
+	"github.com/adnoctem/gopskit/internal/carto/config"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

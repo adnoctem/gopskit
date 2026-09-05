@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fmjstudios/gopskit/internal/carto/app"
-	"github.com/fmjstudios/gopskit/internal/carto/config"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/carto/app"
+	"github.com/adnoctem/gopskit/internal/carto/config"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 )
 

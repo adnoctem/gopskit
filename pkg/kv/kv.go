@@ -9,8 +9,8 @@ import (
 	"os"
 	"sync"
 
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
 	"github.com/dgraph-io/badger/v4"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
 )
 
 // New instantiates a new key-value store and configures it with the given Opt

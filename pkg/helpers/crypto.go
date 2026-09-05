@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/Luzifer/go-dhparam"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/pkg/proc"
 )
 
 const (

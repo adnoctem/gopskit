@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/adnoctem/gopskit/pkg/helpers"
 	"github.com/dgraph-io/badger/v4"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
 )
 
 // enforce implementation of the interface
@@ -73,8 +73,7 @@ func (d *Database) set(key, value []byte) error {
 	defer d.lock.Unlock()
 
 	k := d.namespace(d.currentNamespace, string(key))
-	var err error
-	err = d.kv.Update(func(txn *badger.Txn) error {
+	var err = d.kv.Update(func(txn *badger.Txn) error {
 		err := txn.Set(k, value)
 		if err != nil {
 			return err
@@ -136,8 +135,7 @@ func (d *Database) delete(key []byte) error {
 	defer d.lock.Unlock()
 
 	k := d.namespace(d.currentNamespace, string(key))
-	var err error
-	err = d.kv.Update(func(txn *badger.Txn) error {
+	var err = d.kv.Update(func(txn *badger.Txn) error {
 		err := txn.Delete(k)
 		if err != nil {
 			return err

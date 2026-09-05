@@ -3,15 +3,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 go_library(
     name = "ssolo_lib",
     srcs = ["main.go"],
-    importpath = "github.com/fmjstudios/gopskit/cmd/ssolo",
+    importpath = "github.com/adnoctem/gopskit/cmd/ssolo",
     visibility = ["//visibility:private"],
     x_defs = {
-        "github.com/fmjstudios/gopskit/pkg/stamp.Version": module_version(),
-        "github.com/fmjstudios/gopskit/pkg/stamp.BuildDate": "{BUILD_DATE}",
-        "github.com/fmjstudios/gopskit/pkg/stamp.CommitSHA": "{GIT_COMMIT_SHA}",
-        "github.com/fmjstudios/gopskit/pkg/stamp.Branch": "{GIT_BRANCH}",
-        "github.com/fmjstudios/gopskit/pkg/stamp.Platform": "{PLATFORM}",
-        "github.com/fmjstudios/gopskit/pkg/stamp.GoVersion": "{GO_VERSION}",
+        "github.com/adnoctem/gopskit/pkg/stamp.Version": module_version(),
+        "github.com/adnoctem/gopskit/pkg/stamp.BuildDate": "{BUILD_DATE}",
+        "github.com/adnoctem/gopskit/pkg/stamp.CommitSHA": "{GIT_COMMIT_SHA}",
+        "github.com/adnoctem/gopskit/pkg/stamp.Branch": "{GIT_BRANCH}",
+        "github.com/adnoctem/gopskit/pkg/stamp.Platform": "{PLATFORM}",
+        "github.com/adnoctem/gopskit/pkg/stamp.GoVersion": "{GO_VERSION}",
     },
     deps = [
         "//internal/ssolo/app",

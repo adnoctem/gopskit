@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "log",
     srcs = ["log.go"],
-    importpath = "github.com/fmjstudios/gopskit/pkg/log",
+    importpath = "github.com/adnoctem/gopskit/pkg/log",
     visibility = ["//visibility:public"],
     deps = [
         "@org_uber_go_zap//:zap",

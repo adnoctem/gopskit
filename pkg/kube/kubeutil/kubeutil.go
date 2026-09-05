@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"github.com/fmjstudios/gopskit/pkg/kube"
+	"github.com/adnoctem/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/pkg/kube"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -17,10 +17,7 @@ import (
 func WaitUntilRunning(pod *corev1.Pod) time.Duration {
 	now := time.Now()
 
-	for {
-		if pod.Status.Phase == corev1.PodRunning {
-			break
-		}
+	for pod.Status.Phase != corev1.PodRunning {
 
 		time.Sleep(50 * time.Millisecond)
 	}

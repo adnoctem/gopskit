@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":enablePreCommit"
+  ],
+  "assignees": ["MVProwess"],
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"],
+  "packageRules": [
+    {
+      "matchManagers": ["gomod"],
+      "matchPackageNames": [
+        "k8s.io/**",
+        "sigs.k8s.io/**",
+        "helm.sh/helm/v3",
+        "helm.sh/helm/v3/**"
+      ],
+      "groupName": "kubernetes & helm ecosystem",
+      "minimumReleaseAge": "3 days",
+      "description": "These release in lockstep with each other (helm.sh/helm/v3 itself pins an exact k8s.io/* minor in its own go.mod) - group them so a bump lands as one reviewable PR instead of several that could land out of sync."
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["golang.org/x/**"],
+      "groupName": "golang.org/x packages"
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["breaking-change"],
+      "description": "Major Go module bumps (e.g. an import-path-changing rename, or a breaking API redesign) need a manual look before merge, not just a passing build."
+    }
+  ]
+}

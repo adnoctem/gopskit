@@ -7,7 +7,7 @@ go_library(
         "op.go",
         "types.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/kv",
+    importpath = "github.com/adnoctem/gopskit/pkg/kv",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/fsi",

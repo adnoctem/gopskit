@@ -10,7 +10,7 @@ go_library(
         "keycloak.go",
         "util.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/api/keycloak",
+    importpath = "github.com/adnoctem/gopskit/pkg/api/keycloak",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api",

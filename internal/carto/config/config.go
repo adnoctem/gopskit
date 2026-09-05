@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
 	"gopkg.in/yaml.v3"
 )
 

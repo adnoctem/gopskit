@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fmjstudios/gopskit/internal/fillr/app"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/internal/fillr/app"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
+	"github.com/adnoctem/gopskit/pkg/helpers"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -55,7 +55,7 @@ fillr my-values.yaml -t "{{ index .Values \"kubescape-operator\" \"chartValues\"
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Usage()
+				return cmd.Usage()
 			}
 
 			path := args[0]
@@ -89,7 +89,7 @@ fillr my-values.yaml -t "{{ index .Values \"kubescape-operator\" \"chartValues\"
 				return nil
 			}
 
-			fmt.Println(yaml)
+			fmt.Println(string(yaml))
 			return nil
 		},
 	}

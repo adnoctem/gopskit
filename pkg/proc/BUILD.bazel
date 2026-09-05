@@ -7,7 +7,7 @@ go_library(
         "proc.go",
         "util.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/proc",
+    importpath = "github.com/adnoctem/gopskit/pkg/proc",
     visibility = ["//visibility:public"],
     deps = ["//pkg/log"],
 )

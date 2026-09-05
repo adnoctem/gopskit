@@ -3,9 +3,9 @@ package cmd
 import (
 	"strings"
 
-	"github.com/fmjstudios/gopskit/internal/plattr/app"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +25,7 @@ func NewNginxCommand(app *app.State) *cobra.Command {
 		Long:             "Configure Diffie-Hellman parameters for Ingress-Nginx via Kubernetes Secrets",
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var exists bool = true
+			var exists = true
 
 			opts := make([]helpers.DiffieHellmanOpt, 0)
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
@@ -76,7 +76,9 @@ func NewNginxCommand(app *app.State) *cobra.Command {
 				"dhparam.pem": []byte(params),
 			}
 
-			app.Kube.CreateSecret(secret.Namespace, secret, metav1.CreateOptions{})
+			if err := app.Kube.CreateSecret(secret.Namespace, secret, metav1.CreateOptions{}); err != nil {
+				return err
+			}
 			app.Log.Infof("Successfully created Ingress-Nginx Diffie-Hellman parameter secret: %s in namespace: %s", secret.Name, secret.Namespace)
 			return nil
 		},

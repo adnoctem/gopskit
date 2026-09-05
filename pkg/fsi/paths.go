@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/fmjstudios/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/pkg/helpers"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"

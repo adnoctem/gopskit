@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/fmjstudios/gopskit/pkg/api/keycloak"
-	"github.com/fmjstudios/gopskit/pkg/core"
-	fs "github.com/fmjstudios/gopskit/pkg/fsi"
-	"github.com/fmjstudios/gopskit/pkg/kube"
-	"github.com/fmjstudios/gopskit/pkg/log"
-	"github.com/fmjstudios/gopskit/pkg/proc"
-	"github.com/fmjstudios/gopskit/pkg/stamp"
+	"github.com/adnoctem/gopskit/pkg/api/keycloak"
+	"github.com/adnoctem/gopskit/pkg/core"
+	fs "github.com/adnoctem/gopskit/pkg/fsi"
+	"github.com/adnoctem/gopskit/pkg/kube"
+	"github.com/adnoctem/gopskit/pkg/log"
+	"github.com/adnoctem/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/pkg/stamp"
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +64,7 @@ func New(opts ...Opt) (*State, error) {
 	kec := keycloak.New(
 		DefaultHostname,
 		keycloak.WithAuthPath(getAuthPath(platf.Cache)),
-		keycloak.WithInsecureTLS(true), // TODO(FMJdev): remove this to improve security
+		keycloak.WithInsecureTLS(true), // TODO(MVProwess): remove this to improve security
 		keycloak.WithRealm("master"),
 	)
 

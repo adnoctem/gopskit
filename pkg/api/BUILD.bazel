@@ -6,7 +6,7 @@ go_library(
         "api.go",
         "tls.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/api",
+    importpath = "github.com/adnoctem/gopskit/pkg/api",
     visibility = ["//visibility:public"],
     deps = ["//pkg/fsi"],
 )

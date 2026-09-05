@@ -12,7 +12,7 @@ go_library(
         "paths_linux.go",
         "paths_windows.go",
     ],
-    importpath = "github.com/fmjstudios/gopskit/pkg/fsi",
+    importpath = "github.com/adnoctem/gopskit/pkg/fsi",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/helpers",

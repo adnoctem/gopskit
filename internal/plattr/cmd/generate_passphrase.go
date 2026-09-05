@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/fmjstudios/gopskit/internal/plattr/app"
-	"github.com/fmjstudios/gopskit/pkg/helpers"
+	"github.com/adnoctem/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/pkg/helpers"
 	"github.com/spf13/cobra"
 )
 

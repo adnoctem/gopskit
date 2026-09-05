@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fmjstudios/gopskit/pkg/kube"
-	"github.com/fmjstudios/gopskit/pkg/log"
-	"github.com/fmjstudios/gopskit/pkg/proc"
+	"github.com/adnoctem/gopskit/pkg/kube"
+	"github.com/adnoctem/gopskit/pkg/log"
+	"github.com/adnoctem/gopskit/pkg/proc"
 	corev1 "k8s.io/api/core/v1"
 )
 

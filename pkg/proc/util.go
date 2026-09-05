@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/fmjstudios/gopskit/pkg/log"
+	"github.com/adnoctem/gopskit/pkg/log"
 )
 
 // Must ensures the return values of a function are not errors therefore negating
@@ -38,9 +38,9 @@ type cleanupFunc func() int
 func AwaitCancel(cleanup cleanupFunc) {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(c)
 
 	log.Global.Infof("Received signal: %s. Shutting down gracefully...", <-c)
+	signal.Stop(c)
 	os.Exit(cleanup())
 }
 
@@ -50,8 +50,8 @@ func AwaitCancelWithChannel(cleanup cleanupFunc, signalChan chan os.Signal) {
 	}
 
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(signalChan)
 
 	log.Global.Infof("Received signal: %s. Shutting down gracefully...", <-signalChan)
+	signal.Stop(signalChan)
 	os.Exit(cleanup())
 }
