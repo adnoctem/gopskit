@@ -38,7 +38,7 @@ repos:
     rev: v1.24.6
     hooks:
       - id: typos
-        exclude: (.*\.yaml|^CHANGELOG.md$)
+        exclude: (.*\.yaml|.*\/crds/.*\.yml$|^CHANGELOG.md$)
         args:
           - "--config"
           - ".github/linters/.typos.toml"
@@ -51,11 +51,6 @@ repos:
 
   # Go sources
   #
-  # golangci-lint-repo-mod is the primary linter (formatting via its gofmt/goimports linters,
-  # style/correctness via staticcheck/gocritic/unused/etc, configured in .golangci.yml) - it
-  # replaces most of the individual hooks this project offers. go-mod-tidy-repo and
-  # go-build-repo-mod cover the two things golangci-lint doesn't: keeping go.mod/go.sum in sync
-  # and catching an outright compile failure.
   - repo: https://github.com/tekwizely/pre-commit-golang # See 'pre-commit help autoupdate'
     rev: v1.0.0-rc.4
     hooks:
@@ -84,7 +79,7 @@ repos:
         name: Prettier format
         entry: bun x prettier --write
         language: system
-        files: \.(md|json)$
+        files: \.(md|json|ya?ml)$
         # Without this, pre-commit can batch matched files across several
         # parallel invocations; concurrent 'bun x' processes then race to
         # resolve/install the same 'prettier' package into a cold cache,

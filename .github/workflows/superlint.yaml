@@ -1,6 +1,6 @@
-name: 'Run Super-Linter'
+name: "Run Super-Linter"
 
-on: ['push', 'pull_request']
+on: ["push", "pull_request"]
 
 permissions: {}
 
@@ -26,12 +26,20 @@ jobs:
         env:
           DEFAULT_BRANCH: main
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FILTER_REGEX_EXCLUDE: (.*.mod|.*.sum)
+          # Bazel/Starlark files (MODULE.bazel, BUILD.bazel, *.bzl, the lockfile) have no
+          # dedicated validator here and get misdetected as Python by several linters below,
+          # so they're excluded outright rather than disabling those linters repo-wide.
+          # CHANGELOG.md is semantic-release-generated (excluded from our own markdownlint/typos
+          # pre-commit hooks for the same reason - its per-version headings legitimately repeat).
+          FILTER_REGEX_EXCLUDE: (.*.mod|.*.sum|.*.lock|.*.?bazel.*|^CHANGELOG.md$)
           BASH_EXEC_IGNORE_LIBRARIES: true
           # mostly false positives
           VALIDATE_NATURAL_LANGUAGE: false
           VALIDATE_JSCPD: false
           VALIDATE_KUBERNETES_KUBECONFORM: false
+          # Prettier is authoritative
+          VALIDATE_BIOME_FORMAT: false
+          VALIDATE_BIOME_LINT: false
           # there individual Go files to be linted (all modules)
           VALIDATE_GO: false
           # disable for now, as it's a bit too early for strict rules

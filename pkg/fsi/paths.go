@@ -32,7 +32,7 @@ var (
 )
 
 // PlatformPaths represents the platform-specific paths for Config, Data, Cache or Log files or
-// directories. If AppName isn't set during initialization we will re-use the generic
+// directories. If AppName isn't set during initialization we will reuse the generic
 // 'gopskit' name to ensure we're writing to a subdirectory of the respective paths.
 // This is largely in line with native Platform behaviors.
 //

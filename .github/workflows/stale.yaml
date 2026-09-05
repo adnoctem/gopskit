@@ -1,8 +1,8 @@
-name: 'Close stale Issues & Pull Requests'
+name: "Close stale Issues & Pull Requests"
 
 on:
   schedule:
-    - cron: '30 18 * * 0'
+    - cron: "30 18 * * 0"
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,6 @@ jobs:
           exempt-issue-labels: pinned, security
           exempt-pr-labels: pinned, security
           stale-issue-label: stale
-          stale-issue-message: 'This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs. Thank you for your contributions.'
+          stale-issue-message: "This issue has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs. Thank you for your contributions."
           stale-pr-label: stale
-          stale-pr-message: 'This PR has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs. Thank you for your contributions.'
+          stale-pr-message: "This PR has been automatically marked as stale because it has not had recent activity. It will be closed if no further activity occurs. Thank you for your contributions."

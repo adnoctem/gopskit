@@ -78,7 +78,7 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 				StringData: map[string]string{
 					"CRYPTO_KEY_VALUE":    passphrase,
 					"CRYPTO_KEY_PROVIDER": "secret",
-					"CRYPTO_KEY_CIPHER":   "aes-xts-plain64",
+					"CRYPTO_KEY_CIPHER":   "aes-xts-plain64", //gitleaks:allow -- cipher algorithm name, not a secret
 					"CRYPTO_KEY_HASH":     "sha256",
 					"CRYPTO_KEY_SIZE":     "256",
 					"CRYPTO_PBKDF":        "argon2i",
