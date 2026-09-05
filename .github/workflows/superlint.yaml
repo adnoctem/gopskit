@@ -33,6 +33,10 @@ jobs:
           # pre-commit hooks for the same reason - its per-version headings legitimately repeat).
           FILTER_REGEX_EXCLUDE: (.*.mod|.*.sum|.*.lock|.*.?bazel.*|.*CHANGELOG.md$)
           BASH_EXEC_IGNORE_LIBRARIES: true
+          # Trivy's own CLI flags can be set as env vars (TRIVY_<FLAG_NAME>). Per-vulnerability
+          # ignores (with justification) live in the referenced file rather than a blanket
+          # ignore-unfixed, so each skip is documented and reviewed individually.
+          TRIVY_IGNOREFILE: .github/linters/.trivyignore.yaml
           # mostly false positives
           VALIDATE_NATURAL_LANGUAGE: false
           VALIDATE_JSCPD: false

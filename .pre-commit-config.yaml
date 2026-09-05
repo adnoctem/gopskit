@@ -1,4 +1,4 @@
-exclude: (.*.mod|.*.sum|.*.lock|.*.?bazel.*)
+exclude: (.*.mod|.*.sum|.*.lock|.*.?bazel.*|.*CHANGELOG.md$)
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
