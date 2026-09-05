@@ -80,6 +80,10 @@ repos:
         entry: bun x prettier --write
         language: system
         files: \.(md|json|ya?ml)$
+        # Helm templates embed Go-template actions ({{ ... }}) in YAML; Prettier's YAML printer
+        # doesn't know that and "fixes" the braces' spacing (e.g. "{{ .Values.x }}" becomes
+        # "{ { .Values.x } }"), which breaks the template. Never let it touch chart templates.
+        exclude: (^charts/.*/templates/|^charts/.*/crds/|.*testdata/testchart/.*)
         # Without this, pre-commit can batch matched files across several
         # parallel invocations; concurrent 'bun x' processes then race to
         # resolve/install the same 'prettier' package into a cold cache,

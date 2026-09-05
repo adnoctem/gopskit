@@ -38,6 +38,7 @@ jobs:
           # ignore-unfixed, so each skip is documented and reviewed individually.
           TRIVY_IGNOREFILE: .github/linters/.trivyignore.yaml
           # mostly false positives
+          VALIDATE_SPELL_CODESPELL: false
           VALIDATE_NATURAL_LANGUAGE: false
           VALIDATE_JSCPD: false
           VALIDATE_KUBERNETES_KUBECONFORM: false
