@@ -99,8 +99,10 @@ func (a *Auth) Load() error {
 		return err
 	}
 
-	creds.path = a.path
-	*a = creds
+	// only the exported token fields are persisted; replacing the whole struct would wipe the
+	// in-memory login settings that Refresh depends on
+	a.Created = creds.Created
+	a.JWT = creds.JWT
 	return nil
 }
 

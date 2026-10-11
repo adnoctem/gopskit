@@ -26,6 +26,25 @@ func TestAuthSaveAndLoad(t *testing.T) {
 	asrt.Equal(path, loaded.path)
 }
 
+func TestAuthLoadKeepsInMemoryCredentials(t *testing.T) {
+	asrt := assert.New(t)
+
+	path := filepath.Join(t.TempDir(), "creds.json")
+	asrt.NoError((&Auth{path: path, JWT: &gocloak.JWT{AccessToken: "persisted"}}).Save())
+
+	// only Created and JWT are persisted, so loading must not wipe the login settings - Refresh
+	// loads before it checks them, and would otherwise always fail with ErrAdminAuthUnset
+	a := &Auth{path: path, login: ClientLogin, username: "u", password: "p", clientId: "cid", clientSecret: "cs"}
+	asrt.NoError(a.Load())
+
+	asrt.Equal("persisted", a.JWT.AccessToken)
+	asrt.Equal(ClientLogin, a.login)
+	asrt.Equal("u", a.username)
+	asrt.Equal("p", a.password)
+	asrt.Equal("cid", a.clientId)
+	asrt.Equal("cs", a.clientSecret)
+}
+
 func TestAuthLoadMissingFile(t *testing.T) {
 	asrt := assert.New(t)
 
