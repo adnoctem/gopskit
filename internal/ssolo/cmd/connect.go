@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/adnoctem/gopskit/internal/bridgecmd"
 	"github.com/adnoctem/gopskit/internal/ssolo/app"
 	"github.com/adnoctem/gopskit/pkg/api/keycloak"
+	"github.com/adnoctem/gopskit/pkg/config"
 	"github.com/adnoctem/gopskit/pkg/kube/kubeutil"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,12 +31,9 @@ type keycloakFlags struct {
 func (f *keycloakFlags) add(cmd *cobra.Command) {
 	fs := cmd.Flags()
 
-	fs.StringVar(&f.url, "url", os.Getenv("KEYCLOAK_URL"),
-		"Keycloak's base URL, e.g. https://keycloak.keycloak.svc:8443 (default $KEYCLOAK_URL)")
-	fs.StringVar(&f.username, "username", os.Getenv("KEYCLOAK_ADMIN"),
-		"The administrator to log in as (default $KEYCLOAK_ADMIN)")
-	fs.StringVar(&f.password, "password", "",
-		"The administrator's password (default $KEYCLOAK_ADMIN_PASSWORD)")
+	fs.StringVar(&f.url, "url", "", "Keycloak's base URL, e.g. https://keycloak.keycloak.svc:8443")
+	fs.StringVar(&f.username, "username", "", "The administrator to log in as")
+	fs.StringVar(&f.password, "password", "", "The administrator's password")
 	fs.StringVar(&f.credentialsSecret, "credentials-secret", "",
 		"Read the administrator's credentials from the 'username' and 'password' keys of this Kubernetes Secret, as namespace/name")
 	fs.StringVar(&f.loginRealm, "login-realm", keycloak.DefaultRealm, "The realm the administrator logs in to")
@@ -45,13 +42,17 @@ func (f *keycloakFlags) add(cmd *cobra.Command) {
 		"Don't verify Keycloak's TLS certificate. Insecure: anyone on the path can read the credentials")
 
 	f.conn.AddFlags(fs)
+
+	config.BindEnv(fs, "url", "KEYCLOAK_URL")
+	config.BindEnv(fs, "username", "KEYCLOAK_ADMIN")
+	config.BindEnv(fs, "password", "KEYCLOAK_ADMIN_PASSWORD")
 }
 
 // connect logs in to Keycloak as the flags describe and stores the client on s. The returned
 // function releases the connection.
 func (f *keycloakFlags) connect(ctx context.Context, s *app.State) (func(), error) {
 	if f.url == "" {
-		return nil, errors.New("the URL of Keycloak is required: set --url or $KEYCLOAK_URL")
+		return nil, errors.New("the URL of Keycloak is required: set --url, $KEYCLOAK_URL or url in the configuration file")
 	}
 
 	username, password, err := f.credentials(ctx, s)
@@ -89,17 +90,12 @@ func (f *keycloakFlags) connect(ctx context.Context, s *app.State) (func(), erro
 
 func (f *keycloakFlags) credentials(ctx context.Context, s *app.State) (string, string, error) {
 	if f.credentialsSecret == "" {
-		password := f.password
-		if password == "" {
-			password = os.Getenv("KEYCLOAK_ADMIN_PASSWORD")
-		}
-
-		if f.username == "" || password == "" {
+		if f.username == "" || f.password == "" {
 			return "", "", errors.New(
 				"keycloak administrator credentials are required: set --username and --password, or --credentials-secret")
 		}
 
-		return f.username, password, nil
+		return f.username, f.password, nil
 	}
 
 	namespace, name, ok := strings.Cut(f.credentialsSecret, "/")

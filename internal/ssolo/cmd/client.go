@@ -17,6 +17,7 @@ import (
 	"github.com/adnoctem/gopskit/internal/ssolo/app"
 	"github.com/adnoctem/gopskit/pkg/api/keycloak"
 	apivault "github.com/adnoctem/gopskit/pkg/api/vault"
+	"github.com/adnoctem/gopskit/pkg/config"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -162,12 +163,15 @@ For example, for Vaultwarden:
 	fs.StringVar(&out.format, "format", "env", "The stdout format: env or json")
 	fs.StringVar(&out.secretNamespace, "secret-namespace", "", "The namespace of the Secret --output kubernetes writes")
 	fs.StringVar(&out.secretName, "secret-name", "", "The name of that Secret (default: CLIENT_ID-oidc)")
-	fs.StringVar(&out.vaultAddr, "vault-addr", os.Getenv("VAULT_ADDR"), "Vault's address for --output vault (default $VAULT_ADDR)")
-	fs.StringVar(&out.vaultToken, "vault-token", "", "A Vault token allowed to write --vault-path (default $VAULT_TOKEN)")
+	fs.StringVar(&out.vaultAddr, "vault-addr", "", "Vault's address for --output vault")
+	fs.StringVar(&out.vaultToken, "vault-token", "", "A Vault token allowed to write --vault-path")
 	fs.StringVar(&out.vaultMount, "vault-mount", "kv", "The KV-v2 secrets engine's mount path")
 	fs.StringVar(&out.vaultPath, "vault-path", "", "The secret's path within the mount (default: CLIENT_ID/credentials/oidc)")
 	fs.StringSliceVar(&out.vaultCACerts, "vault-ca-cert", nil, "A PEM CA certificate to trust for Vault's TLS certificate (repeatable)")
 	fs.BoolVar(&out.vaultInsecure, "vault-insecure-skip-tls-verify", false, "Don't verify Vault's TLS certificate. Insecure")
+
+	config.BindEnv(fs, "vault-addr", "VAULT_ADDR")
+	config.BindEnv(fs, "vault-token", "VAULT_TOKEN")
 
 	_ = cmd.MarkFlagRequired("redirect-uri")
 
@@ -211,11 +215,8 @@ func (o *clientOutput) validate(clientID string) error {
 	}
 
 	if o.wants(outputVault) {
-		if o.vaultToken == "" {
-			o.vaultToken = os.Getenv("VAULT_TOKEN")
-		}
 		if o.vaultAddr == "" || o.vaultToken == "" {
-			return errors.New("--output vault requires --vault-addr and --vault-token, or $VAULT_ADDR and $VAULT_TOKEN")
+			return errors.New("--output vault requires --vault-addr and --vault-token")
 		}
 		if o.vaultPath == "" {
 			o.vaultPath = clientID + "/credentials/oidc"

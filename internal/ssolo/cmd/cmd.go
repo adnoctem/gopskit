@@ -5,6 +5,7 @@ import (
 
 	"github.com/adnoctem/gopskit/internal/bridgecmd"
 	"github.com/adnoctem/gopskit/internal/ssolo/app"
+	"github.com/adnoctem/gopskit/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +18,10 @@ var (
 )
 
 func NewRootCommand(ssolo *app.State) *cobra.Command {
+	// run every persistent pre-run hook from the root down, so the configuration file still
+	// loads under subcommands with hooks of their own, such as the proxy group
+	cobra.EnableTraverseRunHooks = true
+
 	cmd := &cobra.Command{
 		Use:   ssolo.Name,
 		Short: fmt.Sprintf("%s CLI", ssolo.Name),
@@ -34,10 +39,16 @@ for cluster-internal addresses such as https://keycloak.keycloak.svc:8443 - see 
 
 			return nil
 		},
+		// every flag can also come from the environment (where bound) or the configuration file
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			return config.Load(app.Name, cmd)
+		},
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
 		},
 	}
+
+	config.AddFlag(cmd, app.Name)
 
 	// add subcommands
 	for _, opt := range Commands {

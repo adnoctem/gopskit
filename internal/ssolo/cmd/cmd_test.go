@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,6 +26,10 @@ import (
 // newState is ssolo's state with its token cache in a temporary directory and a fake cluster.
 func newState(t *testing.T, objects ...corev1.Secret) (*app.State, *fake.Clientset) {
 	t.Helper()
+
+	// keep the tests away from a real configuration file and token cache
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Chdir(t.TempDir())
 
 	s, err := app.New()
 	require.NoError(t, err)
@@ -112,6 +118,28 @@ func TestAgainstKeycloak(t *testing.T) {
 		require.NoError(t, err)
 
 		exists, err := adminClient(t, url).RealmExists(ctx, "from-secret")
+		require.NoError(t, err)
+		assert.True(t, exists)
+	})
+
+	t.Run("settings come from the configuration file", func(t *testing.T) {
+		s, _ := newState(t)
+
+		path := filepath.Join(t.TempDir(), "ssolo.yaml")
+		require.NoError(t, os.WriteFile(path, []byte(fmt.Sprintf(`
+url: %s
+username: %s
+password: %s
+initialize:
+  realms: [from-config]
+  groups: [readers]
+`, url, keycloaktest.AdminUser, keycloaktest.AdminPassword)), 0o600))
+
+		// the section is written under the command's name; "init" is only an alias of it
+		_, err := run(t, s, "init", "--config", path)
+		require.NoError(t, err)
+
+		exists, err := adminClient(t, url).GroupExists(ctx, "from-config", "readers")
 		require.NoError(t, err)
 		assert.True(t, exists)
 	})
