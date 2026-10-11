@@ -16,7 +16,6 @@ go_deps.from_file(go_mod = "//:go.mod")
 use_repo(
     go_deps,
     "cat_dario_mergo",
-    "com_github_dgraph_io_badger_v4",
     "com_github_go_resty_resty_v2",
     "com_github_google_go_cmp",
     "com_github_hashicorp_hcl_v2",
@@ -45,14 +44,4 @@ use_repo(
 # ref: https://github.com/bazelbuild/bazel-gazelle/issues/1885
 go_deps.gazelle_override(
     path = "github.com/go-resty/resty/v2",
-)
-
-# Disable Protobuf BUILD file generation for BadgerDB, since
-# they'll most likely fail the build since we do not have a C/CXX
-# toolchain registered
-go_deps.gazelle_override(
-    directives = [
-        "gazelle:proto disable_global",
-    ],
-    path = "github.com/dgraph-io/badger/v4",
 )
