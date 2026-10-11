@@ -1,0 +1,30 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "gopskit-bridge_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/adnoctem/gopskit/cmd/gopskit-bridge",
+    visibility = ["//visibility:private"],
+    x_defs = {
+        "github.com/adnoctem/gopskit/pkg/stamp.Version": module_version(),
+        "github.com/adnoctem/gopskit/pkg/stamp.BuildDate": "{BUILD_DATE}",
+        "github.com/adnoctem/gopskit/pkg/stamp.CommitSHA": "{GIT_COMMIT_SHA}",
+        "github.com/adnoctem/gopskit/pkg/stamp.Branch": "{GIT_BRANCH}",
+        "github.com/adnoctem/gopskit/pkg/stamp.Platform": "{PLATFORM}",
+        "github.com/adnoctem/gopskit/pkg/stamp.GoVersion": "{GO_VERSION}",
+    },
+    deps = [
+        "//pkg/bridge/socks5",
+        "//pkg/log",
+        "//pkg/stamp",
+    ],
+)
+
+go_binary(
+    name = "gopskit-bridge",
+    out = "gopskit-bridge",
+    embed = [":gopskit-bridge_lib"],
+    # static, so the binary runs in an image with no libc
+    pure = "on",
+    visibility = ["//visibility:public"],
+)
