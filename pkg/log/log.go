@@ -126,3 +126,11 @@ func WithDevelopment() Option {
 		logger.conf.Development = true
 	}
 }
+
+// WithOutputPaths sends the Logger's output to the given zap sinks, e.g. "stderr" for a CLI
+// whose standard output carries data meant for another program
+func WithOutputPaths(paths ...string) Option {
+	return func(logger *Logger) {
+		logger.conf.OutputPaths = paths
+	}
+}
