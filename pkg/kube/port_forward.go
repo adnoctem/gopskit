@@ -1,9 +1,9 @@
 package kube
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sync"
@@ -30,21 +30,22 @@ type DefaultPortForwarder struct{}
 func (*DefaultPortForwarder) ForwardPorts(method string, restConfig *rest.Config, url *url.URL, ports []string, stopChan,
 	readyChan chan struct{}) error {
 	var err error
-	var stdOut, stdErr bytes.Buffer
 
 	dialer, err := createDialer(method, url, restConfig)
 	if err != nil {
 		return err
 	}
 
+	// client-go writes a line per connection from that connection's own goroutine, so the
+	// writers must be safe for concurrent use; nothing reads them, hence io.Discard
 	pf, err := portforward.NewOnAddresses(
 		dialer,
 		[]string{"localhost"},
 		ports,
 		stopChan,
 		readyChan,
-		&stdOut,
-		&stdErr,
+		io.Discard,
+		io.Discard,
 	)
 	if err != nil {
 		return err
@@ -173,15 +174,15 @@ func (c *Client) Forward(ctx context.Context, pod corev1.Pod, remotePort int) (*
 	f := &Forward{stop: make(chan struct{}), done: make(chan error, 1)}
 	ready := make(chan struct{})
 
-	var stdOut, stdErr bytes.Buffer
+	// see DefaultPortForwarder.ForwardPorts for why the output is discarded
 	pf, err := portforward.NewOnAddresses(
 		dialer,
 		[]string{"127.0.0.1"},
 		[]string{fmt.Sprintf("0:%d", remotePort)},
 		f.stop,
 		ready,
-		&stdOut,
-		&stdErr,
+		io.Discard,
+		io.Discard,
 	)
 	if err != nil {
 		return nil, err
