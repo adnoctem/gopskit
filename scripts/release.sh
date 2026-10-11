@@ -199,8 +199,8 @@ function release::calculate_checksums() {
 function main() {
 	local cmd=${1}
 
-	# initialize constants
-	raw=$(bazel --output_user_root="$BAZEL_CACHE_PATH" query 'kind("go_binary", //...)' 2>/dev/null)
+	# initialize constants - gopskit-bridge only ever runs from its container image, so it gets no tarball
+	raw=$(bazel --output_user_root="$BAZEL_CACHE_PATH" query 'kind("go_binary", //...) except //cmd/gopskit-bridge:all' 2>/dev/null)
 	while IFS="$(printf '\n')" read -r line; do LABELS+=("$line"); done <<<"$raw"
 	while IFS="$(printf '\n')" read -r line; do PKGS+=("$(echo "$line" | cut -d':' -f 2)"); done <<<"$raw"
 	unset IFS

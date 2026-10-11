@@ -20,6 +20,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      published: ${{ steps.semantic.outputs.new_release_published }}
+      version: ${{ steps.semantic.outputs.new_release_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -41,3 +44,38 @@ jobs:
             @semantic-release/exec@7.0.3
             @semantic-release/git@10.0.1
             conventional-changelog-conventionalcommits@8.0.0
+
+  # Publishes the gopskit-bridge image for the release just created. It's a separate job so it's the
+  # only one holding `packages: write`, and it deliberately uses no build cache - a cache shared with
+  # untrusted workflow runs could poison what gets published.
+  image:
+    name: Publish gopskit-bridge image
+    needs: release
+    if: needs.release.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # check out the release tag
+      packages: write # push ghcr.io/adnoctem/gopskit-bridge
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: v${{ needs.release.outputs.version }}
+          persist-credentials: false
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Push gopskit-bridge image
+        env:
+          GOPSKIT_VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          bazel run --stamp //cmd/gopskit-bridge:push -- --tag "$GOPSKIT_VERSION" --tag latest
+
+      - name: Log out of GHCR
+        if: always()
+        run: |
+          docker logout ghcr.io

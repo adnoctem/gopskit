@@ -1,4 +1,7 @@
+load("@aspect_bazel_lib//lib:transitions.bzl", "platform_transition_filegroup")
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_image_index", "oci_load", "oci_push")
+load("@tar.bzl//tar:tar.bzl", "tar")
 
 go_library(
     name = "gopskit-bridge_lib",
@@ -6,7 +9,7 @@ go_library(
     importpath = "github.com/adnoctem/gopskit/cmd/gopskit-bridge",
     visibility = ["//visibility:private"],
     x_defs = {
-        "github.com/adnoctem/gopskit/pkg/stamp.Version": module_version(),
+        "github.com/adnoctem/gopskit/pkg/stamp.Version": "{STABLE_GOPSKIT_VERSION}",
         "github.com/adnoctem/gopskit/pkg/stamp.BuildDate": "{BUILD_DATE}",
         "github.com/adnoctem/gopskit/pkg/stamp.CommitSHA": "{GIT_COMMIT_SHA}",
         "github.com/adnoctem/gopskit/pkg/stamp.Branch": "{GIT_BRANCH}",
@@ -27,4 +30,89 @@ go_binary(
     # static, so the binary runs in an image with no libc
     pure = "on",
     visibility = ["//visibility:public"],
+)
+
+# ----------------------
+#   Container image
+# ----------------------
+#
+# A single static binary on an empty base, running as a fixed non-root UID so the pod satisfies
+# the "restricted" Pod Security Standard. The image is built once per architecture and combined
+# into one multi-arch index; the CLIs deploy it with `<cli> proxy setup`.
+
+IMAGE_LABELS = {
+    "org.opencontainers.image.description": "SOCKS5 bridge into a Kubernetes cluster for the gopskit CLIs",
+    "org.opencontainers.image.licenses": "MIT",
+    "org.opencontainers.image.source": "https://github.com/adnoctem/gopskit",
+    "org.opencontainers.image.title": "gopskit-bridge",
+}
+
+platform_transition_filegroup(
+    name = "binary_linux_amd64",
+    srcs = [":gopskit-bridge"],
+    target_platform = "@io_bazel_rules_go//go/toolchain:linux_amd64",
+)
+
+platform_transition_filegroup(
+    name = "binary_linux_arm64",
+    srcs = [":gopskit-bridge"],
+    target_platform = "@io_bazel_rules_go//go/toolchain:linux_arm64",
+)
+
+tar(
+    name = "layer_linux_amd64",
+    srcs = [":binary_linux_amd64"],
+    mtree = ["gopskit-bridge uid=65532 gid=65532 mode=0555 time=0 type=file content=$(execpath :binary_linux_amd64)"],
+)
+
+tar(
+    name = "layer_linux_arm64",
+    srcs = [":binary_linux_arm64"],
+    mtree = ["gopskit-bridge uid=65532 gid=65532 mode=0555 time=0 type=file content=$(execpath :binary_linux_arm64)"],
+)
+
+oci_image(
+    name = "image_linux_amd64",
+    architecture = "amd64",
+    entrypoint = ["/gopskit-bridge"],
+    labels = IMAGE_LABELS,
+    os = "linux",
+    tars = [":layer_linux_amd64"],
+    user = "65532:65532",
+    workdir = "/",
+)
+
+oci_image(
+    name = "image_linux_arm64",
+    architecture = "arm64",
+    entrypoint = ["/gopskit-bridge"],
+    labels = IMAGE_LABELS,
+    os = "linux",
+    tars = [":layer_linux_arm64"],
+    user = "65532:65532",
+    variant = "v8",
+    workdir = "/",
+)
+
+oci_image_index(
+    name = "image",
+    images = [
+        ":image_linux_amd64",
+        ":image_linux_arm64",
+    ],
+)
+
+# `bazel run //cmd/gopskit-bridge:load` loads the amd64 image into the local Docker engine as
+# gopskit-bridge:dev, which is what the k3s end-to-end tests deploy
+oci_load(
+    name = "load",
+    image = ":image_linux_amd64",
+    repo_tags = ["gopskit-bridge:dev"],
+)
+
+# the release workflow passes the version tags at runtime: bazel run :push -- --tag 1.2.3
+oci_push(
+    name = "push",
+    image = ":image",
+    repository = "ghcr.io/adnoctem/gopskit-bridge",
 )
