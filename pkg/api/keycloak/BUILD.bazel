@@ -8,6 +8,7 @@ go_library(
         "errors.go",
         "get.go",
         "keycloak.go",
+        "oidc.go",
         "util.go",
     ],
     importpath = "github.com/adnoctem/gopskit/pkg/api/keycloak",
@@ -31,10 +32,18 @@ alias(
 
 go_test(
     name = "keycloak_test",
-    srcs = ["keycloak_test.go"],
+    # the integration tests run Keycloak in a container, skipping themselves when there is no Docker daemon
+    size = "large",
+    srcs = [
+        "integration_test.go",
+        "keycloak_test.go",
+    ],
     embed = [":keycloak"],
+    tags = ["requires-network"],
     deps = [
+        "//pkg/api/keycloak/keycloaktest",
         "@com_github_nerzal_gocloak_v14//:gocloak",
         "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
     ],
 )

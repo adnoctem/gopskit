@@ -1,9 +1,11 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "cmd",
     srcs = [
+        "client.go",
         "cmd.go",
+        "connect.go",
         "init.go",
     ],
     importpath = "github.com/adnoctem/gopskit/internal/ssolo/cmd",
@@ -12,11 +14,12 @@ go_library(
         "//internal/bridgecmd",
         "//internal/ssolo/app",
         "//pkg/api/keycloak",
+        "//pkg/api/vault",
         "//pkg/kube/kubeutil",
-        "//pkg/proc",
         "@com_github_nerzal_gocloak_v14//:gocloak",
         "@com_github_spf13_cobra//:cobra",
         "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/api/errors",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
     ],
 )
@@ -25,4 +28,26 @@ alias(
     name = "go_default_library",
     actual = ":cmd",
     visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "cmd_test",
+    # the command tests run Keycloak and Vault in containers, skipping themselves when there is no Docker daemon
+    size = "large",
+    srcs = ["cmd_test.go"],
+    embed = [":cmd"],
+    tags = ["requires-network"],
+    deps = [
+        "//internal/ssolo/app",
+        "//pkg/api/keycloak",
+        "//pkg/api/keycloak/keycloaktest",
+        "//pkg/api/vault",
+        "//pkg/api/vault/vaulttest",
+        "//pkg/kube",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_client_go//kubernetes/fake",
+    ],
 )

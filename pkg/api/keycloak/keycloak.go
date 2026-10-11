@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -355,6 +356,17 @@ func (kc *Client) SetLogin(login login) {
 	kc.auth.login = login
 }
 
+// SetTransport routes the client's requests through rt, e.g. one reaching Keycloak through the
+// gopskit bridge. The client's own TLS settings are applied to an *http.Transport.
+func (kc *Client) SetTransport(rt http.RoundTripper) {
+	if t, ok := rt.(*http.Transport); ok {
+		t.TLSClientConfig = kc.tls
+	}
+
+	kc.api.RestyClient().SetTransport(rt)
+}
+
+// SetRealm sets the realm the client logs in to. Resource methods take their realm explicitly.
 func (kc *Client) SetRealm(r string) {
 	kc.realm = r
 }
@@ -426,6 +438,26 @@ func (kc *Client) applyTLSConfig() {
 // if recovery wasn't possible. It deliberately never dispatches another authenticated API
 // request itself (e.g. via kc.Realms()) - doing so would re-enter this handler on a persistently
 // invalid token and recurse indefinitely.
+// withAuth runs call with the current access token. If the token was rejected it recovers once
+// through handleAuthorizationError and retries the call exactly once.
+func withAuth[T any](kc *Client, call func(token string) (T, error)) (T, error) {
+	var zero T
+	if kc.auth == nil || kc.auth.JWT == nil {
+		return zero, ErrNotLoggedIn
+	}
+
+	v, err := call(kc.auth.JWT.AccessToken)
+	if err == nil {
+		return v, nil
+	}
+
+	if handled := kc.handleAuthorizationError(err); handled != nil {
+		return zero, handled
+	}
+
+	return call(kc.auth.JWT.AccessToken)
+}
+
 func (kc *Client) handleAuthorizationError(err error) error {
 	if !kc.isUnauthorizedErr(err) {
 		return err

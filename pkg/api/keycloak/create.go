@@ -6,44 +6,36 @@ import (
 	"github.com/Nerzal/gocloak/v14"
 )
 
-func (kc *Client) CreateRealm(realm *gocloak.RealmRepresentation) error {
-	_, err := kc.api.CreateRealm(context.Background(), kc.auth.JWT.AccessToken, *realm)
-	if err != nil {
-		if handled := kc.handleAuthorizationError(err); handled != nil {
-			return handled
-		}
+// CreateRealm creates a realm.
+func (kc *Client) CreateRealm(ctx context.Context, realm gocloak.RealmRepresentation) error {
+	_, err := withAuth(kc, func(token string) (string, error) {
+		return kc.api.CreateRealm(ctx, token, realm)
+	})
 
-		_, err = kc.api.CreateRealm(context.Background(), kc.auth.JWT.AccessToken, *realm)
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (kc *Client) CreateGroup(group gocloak.Group) error {
-	_, err := kc.api.CreateGroup(context.Background(), kc.auth.JWT.AccessToken, kc.realm, group)
-	if err != nil {
-		if handled := kc.handleAuthorizationError(err); handled != nil {
-			return handled
-		}
+// CreateGroup creates a top-level group in realm.
+func (kc *Client) CreateGroup(ctx context.Context, realm string, group gocloak.Group) error {
+	_, err := withAuth(kc, func(token string) (string, error) {
+		return kc.api.CreateGroup(ctx, token, realm, group)
+	})
 
-		_, err = kc.api.CreateGroup(context.Background(), kc.auth.JWT.AccessToken, kc.realm, group)
-		return err
-	}
-
-	return nil
+	return err
 }
 
-func (kc *Client) CreateClient(client gocloak.Client) error {
-	_, err := kc.api.CreateClient(context.Background(), kc.auth.JWT.AccessToken, kc.realm, client)
-	if err != nil {
-		if handled := kc.handleAuthorizationError(err); handled != nil {
-			return handled
-		}
+// CreateClient creates a client in realm and returns its internal ID - not its client ID.
+func (kc *Client) CreateClient(ctx context.Context, realm string, client gocloak.Client) (string, error) {
+	return withAuth(kc, func(token string) (string, error) {
+		return kc.api.CreateClient(ctx, token, realm, client)
+	})
+}
 
-		_, err = kc.api.CreateClient(context.Background(), kc.auth.JWT.AccessToken, kc.realm, client)
-		return err
-	}
+// UpdateClient replaces the client identified by client.ID in realm.
+func (kc *Client) UpdateClient(ctx context.Context, realm string, client gocloak.Client) error {
+	_, err := withAuth(kc, func(token string) (struct{}, error) {
+		return struct{}{}, kc.api.UpdateClient(ctx, token, realm, client)
+	})
 
-	return nil
+	return err
 }

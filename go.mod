@@ -17,6 +17,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/testcontainers/testcontainers-go/modules/k3s v0.44.0
+	github.com/testcontainers/testcontainers-go/modules/vault v0.44.0
 	github.com/vmware-labs/yaml-jsonpath v0.3.2
 	go.uber.org/zap v1.28.0
 	golang.org/x/mod v0.40.0

@@ -1,17 +1,21 @@
 package keycloak
 
 import (
+	"context"
+	"errors"
+
 	"github.com/Nerzal/gocloak/v14"
 )
 
-func (kc *Client) RealmExists(name string) (bool, error) {
-	realms, err := kc.Realms()
+// RealmExists reports whether a realm named name exists.
+func (kc *Client) RealmExists(ctx context.Context, name string) (bool, error) {
+	realms, err := kc.Realms(ctx)
 	if err != nil {
 		return false, err
 	}
 
 	for _, v := range realms {
-		if *v.Realm == name {
+		if v.Realm != nil && *v.Realm == name {
 			return true, nil
 		}
 	}
@@ -19,8 +23,9 @@ func (kc *Client) RealmExists(name string) (bool, error) {
 	return false, nil
 }
 
-func (kc *Client) GroupExists(name string) (bool, error) {
-	groups, err := kc.Groups(gocloak.GetGroupsParams{
+// GroupExists reports whether a top-level group named name exists in realm.
+func (kc *Client) GroupExists(ctx context.Context, realm, name string) (bool, error) {
+	groups, err := kc.Groups(ctx, realm, gocloak.GetGroupsParams{
 		Search: &name,
 	})
 	if err != nil {
@@ -28,7 +33,7 @@ func (kc *Client) GroupExists(name string) (bool, error) {
 	}
 
 	for _, v := range groups {
-		if *v.Name == name {
+		if v.Name != nil && *v.Name == name {
 			return true, nil
 		}
 	}
@@ -36,20 +41,15 @@ func (kc *Client) GroupExists(name string) (bool, error) {
 	return false, nil
 }
 
-func (kc *Client) ClientExists(clientId string) (bool, error) {
-	clients, err := kc.Clients(gocloak.GetClientsParams{
-		ClientID: &clientId,
-		Search:   gocloak.BoolP(true),
-	})
-	if err != nil {
+// ClientExists reports whether a client with the given client ID exists in realm.
+func (kc *Client) ClientExists(ctx context.Context, realm, clientID string) (bool, error) {
+	_, err := kc.GetClient(ctx, realm, clientID)
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, ErrClientNotFound):
+		return false, nil
+	default:
 		return false, err
 	}
-
-	for _, v := range clients {
-		if *v.ClientID == clientId {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }

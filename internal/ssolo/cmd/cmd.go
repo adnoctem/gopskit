@@ -12,21 +12,21 @@ var (
 	// Commands is a slice of CLIOpt options for subcommands of the 'ssolo' CLI
 	Commands = []app.CLIOpt{
 		NewInitCommand,
+		NewClientCommand,
 	}
 )
 
 func NewRootCommand(ssolo *app.State) *cobra.Command {
-	var (
-		label     string
-		namespace string
-	)
-
 	cmd := &cobra.Command{
-		Use:              ssolo.Name,
-		Short:            fmt.Sprintf("%s CLI", ssolo.Name),
-		Long:             "Manage authentication for Kubernetes applications using Keycloak",
+		Use:   ssolo.Name,
+		Short: fmt.Sprintf("%s CLI", ssolo.Name),
+		Long: `Manage single sign-on with Keycloak.
+
+ssolo reaches Keycloak at --url: directly, e.g. through an Ingress, or through the gopskit bridge
+for cluster-internal addresses such as https://keycloak.keycloak.svc:8443 - see 'ssolo proxy'.`,
 		TraverseChildren: true,
 		SilenceErrors:    true,
+		SilenceUsage:     true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return cmd.Usage()
@@ -34,36 +34,17 @@ func NewRootCommand(ssolo *app.State) *cobra.Command {
 
 			return nil
 		},
-		// subcommands that need the cluster get the client here; the proxy group overrides this
-		// hook and creates the client only when it needs it
-		PersistentPreRunE: func(*cobra.Command, []string) error {
-			_, err := ssolo.KubeClient()
-			return err
-		},
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
 		},
 	}
-
-	addKubernetesFlags(cmd, &label, &namespace)
 
 	// add subcommands
 	for _, opt := range Commands {
 		cmd.AddCommand(opt(ssolo))
 	}
 
-	cmd.AddCommand(bridgecmd.NewProxyCommand(bridgecmd.Options{
-		CLI:     app.Name,
-		Version: ssolo.Stamp.Version,
-		Kube:    ssolo.KubeClient,
-		Log:     ssolo.Log,
-	}))
+	cmd.AddCommand(bridgecmd.NewProxyCommand(bridgeOptions(ssolo)))
 
 	return cmd
-}
-
-func addKubernetesFlags(cmd *cobra.Command, label, namespace *string) {
-	cmd.PersistentFlags().StringVarP(label, "label", "l", app.DefaultLabel, "The Kubernetes label to filter resources by")
-	cmd.PersistentFlags().StringVarP(namespace, "namespace", "n", app.DefaultNamespace,
-		"The Kubernetes namespace to use. None equates to checking the entire cluster.")
 }

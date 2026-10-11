@@ -1,191 +1,86 @@
 package cmd
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/Nerzal/gocloak/v14"
 	"github.com/adnoctem/gopskit/internal/ssolo/app"
 	"github.com/adnoctem/gopskit/pkg/api/keycloak"
-	"github.com/adnoctem/gopskit/pkg/kube/kubeutil"
-	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ app.CLIOpt = NewInitCommand // assure type compatibility
 
 // NewInitCommand creates the Option which injects the 'init' subcommand into
 // the 'ssolo' CLI application
-func NewInitCommand(app *app.State) *cobra.Command {
+func NewInitCommand(ssolo *app.State) *cobra.Command {
 	var (
-		username, password, secretName string
-		groups, realms                 []string
+		kf             keycloakFlags
+		groups, realms []string
 	)
 
 	cmd := &cobra.Command{
-		Use:              "initialize",
-		Short:            "Initialize Keycloak",
-		Aliases:          []string{"init"},
-		Long:             "Initialize Keycloak using a Bootstrap admin user",
-		TraverseChildren: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			label := proc.Must(cmd.Flags().GetString("label"))
-			namespace := proc.Must(cmd.Flags().GetString("namespace"))
+		Use:     "initialize",
+		Short:   "Initialize Keycloak",
+		Aliases: []string{"init"},
+		Long: `Create the realms, and the groups within each of them, that the cluster's applications sign
+their users in with. Safe to run repeatedly: what already exists is left as it is.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
 
-			var basicAuth, secretAuth bool
-			var podNamespace string
-			var leaderPod *corev1.Pod
-
-			// handle flags
-			switch {
-			case secretName != "":
-				secretAuth = true
-			case username != "" && password != "":
-				basicAuth = true
-			default:
-				return fmt.Errorf("impossible to authenticate to Keycloak without providing username/password or a Secret")
-			}
-
-			// look across the entire cluster
-			pods, err := app.Kube.Pods("", metav1.ListOptions{LabelSelector: label})
-			if err != nil {
-				return fmt.Errorf("could not retrieve Keycloak Pods for labelSelector: %s. Error: %v", label, err)
-			}
-
-			// ensure we're using a single namespace, or it's passed in
-			podNamespace, err = kubeutil.EnsureNamespace(pods)
-			if err != nil && namespace == "" {
-				return fmt.Errorf("found multiple possible Keycloak pods. the namespace option is unset and %v", err)
-			}
-
-			if secretAuth {
-				secret, err := app.Kube.Secret(namespace, secretName, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				result, err := kubeutil.ParseSecretKeys(secret, "username", "password")
-				if err != nil {
-					return err
-				}
-
-				username = result["username"]
-				password = result["password"]
-			}
-
-			if !basicAuth && !secretAuth {
-				return errors.New("exhausted Keycloak authentication options, cannot configure")
-			}
-
-			// wait until the pod is running
-			// TODO(MVProwess): make the latter label configurable
-			leaderPod, err = kubeutil.LeaderPod(app.Kube, podNamespace, label, "apps.kubernetes.io/pod-index=0")
+			release, err := kf.connect(ctx, ssolo)
 			if err != nil {
 				return err
 			}
-			elapsed := kubeutil.WaitUntilRunning(leaderPod)
-			app.Log.Infof("Keycloak Pod took %d ms to become running", elapsed.Milliseconds()/1000)
+			defer release()
 
-			// port-forward the (leader)
-			app.Log.Infof("Port-forwarding Keycloak leader pod: %s", leaderPod.Name)
-			ctx, cancel := context.WithCancel(context.Background())
-			readyChan := make(chan struct{})
-			go func(rc chan struct{}) {
-				err := app.Kube.PortForward(ctx, *leaderPod, rc)
+			kc := ssolo.Keycloak
+			for _, realm := range realms {
+				exists, err := kc.RealmExists(ctx, realm)
 				if err != nil {
-					panic(err)
-				}
-			}(readyChan)
-
-			app.Log.Info("Waiting for port-forwarded Keycloak API to become available...")
-			<-readyChan
-
-			// authenticate to the API as soon as it's locally available
-			app.Keycloak.SetUser(username)
-			app.Keycloak.SetPassword(password)
-			app.Keycloak.SetRealm("master")
-
-			// obtain & save the access token
-			err = app.Keycloak.Login()
-			if err != nil {
-				cancel()
-				return err
-			}
-
-			// create Keycloak groups
-			var createGroups []gocloak.Group
-			for _, v := range groups {
-				createGroups = append(createGroups, gocloak.Group{
-					Name: gocloak.StringP(v),
-				})
-			}
-
-			for _, v := range createGroups {
-				exists, err := app.Keycloak.GroupExists(*v.Name)
-				if err != nil {
-					cancel()
 					return err
 				}
 
 				if exists {
-					app.Log.Infof("skipping creation of Keycloak group: %s. Group already exists.", *v.Name)
-					continue
+					ssolo.Log.Infof("realm %s already exists", realm)
+				} else {
+					err := kc.CreateRealm(ctx, gocloak.RealmRepresentation{
+						Enabled:     gocloak.BoolP(true),
+						Realm:       gocloak.StringP(realm),
+						DisplayName: gocloak.StringP(keycloak.CreateDisplayName(realm)),
+					})
+					if err != nil {
+						return fmt.Errorf("could not create realm %s: %w", realm, err)
+					}
+					ssolo.Log.Infof("created realm %s", realm)
 				}
 
-				err = app.Keycloak.CreateGroup(v)
-				if err != nil {
-					cancel()
-					return fmt.Errorf("could not create Keycloak group: %s. Error: %v", *v.Name, err)
-				}
-			}
-			app.Log.Infof("successfully created Keycloak groups: [%s]", strings.Join(groups, ", "))
+				for _, group := range groups {
+					exists, err := kc.GroupExists(ctx, realm, group)
+					if err != nil {
+						return err
+					}
 
-			// create Keycloak realms
-			var createRealms []*gocloak.RealmRepresentation
-			for _, v := range realms {
-				createRealms = append(createRealms, &gocloak.RealmRepresentation{
-					Enabled:     gocloak.BoolP(true),
-					Realm:       &v,
-					DisplayName: gocloak.StringP(keycloak.CreateDisplayName(v)),
-				})
-			}
+					if exists {
+						ssolo.Log.Infof("group %s already exists in realm %s", group, realm)
+						continue
+					}
 
-			for _, v := range createRealms {
-				exists, err := app.Keycloak.RealmExists(*v.Realm)
-				if err != nil {
-					cancel()
-					return err
-				}
-
-				if exists {
-					app.Log.Infof("skipping creation of Keycloak realm: %s. Realm already exists.", *v.Realm)
-					continue
-				}
-
-				err = app.Keycloak.CreateRealm(v)
-				if err != nil {
-					cancel()
-					return fmt.Errorf("could not create Keycloak realm: %s. Error: %v", *v.Realm, err)
+					if err := kc.CreateGroup(ctx, realm, gocloak.Group{Name: gocloak.StringP(group)}); err != nil {
+						return fmt.Errorf("could not create group %s in realm %s: %w", group, realm, err)
+					}
+					ssolo.Log.Infof("created group %s in realm %s", group, realm)
 				}
 			}
-			app.Log.Infof("successfully created Keycloak realms: [%s]", strings.Join(realms, ", "))
 
-			// Finished
-			app.Log.Info("successfully initialized Keycloak!")
-			cancel()
+			ssolo.Log.Info("Keycloak is initialized")
 			return nil
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(&username, "username", "", "The name of the bootstrap admin user")
-	cmd.PersistentFlags().StringVar(&password, "password", "", "The password for the bootstrap admin user")
-	cmd.PersistentFlags().StringVar(&secretName, "secret-name", "", "The name of a Kubernetes Secret containing a username and password key")
-	cmd.PersistentFlags().StringArrayVar(&realms, "realms", []string{"operations", "applications"}, "The Keycloak realms to create")
-	cmd.PersistentFlags().StringArrayVar(&groups, "groups", []string{"admins", "users"}, "The Keycloak groups to create")
+	kf.add(cmd)
+	cmd.Flags().StringSliceVar(&realms, "realms", []string{"operations", "applications"}, "The realms to create")
+	cmd.Flags().StringSliceVar(&groups, "groups", []string{"admins", "users"}, "The groups to create in each realm")
 
 	return cmd
 }

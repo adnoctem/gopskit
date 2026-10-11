@@ -1,13 +1,11 @@
 package app
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/adnoctem/gopskit/pkg/api/keycloak"
 	"github.com/adnoctem/gopskit/pkg/core"
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
-	"github.com/adnoctem/gopskit/pkg/kube"
 	"github.com/adnoctem/gopskit/pkg/log"
 	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/adnoctem/gopskit/pkg/stamp"
@@ -15,14 +13,7 @@ import (
 )
 
 const (
-	Name             string = "ssolo"
-	DefaultLabel     string = "app=keycloak,app.kubernetes.io/instance=keycloak"
-	DefaultNamespace string = "keycloak"
-	DefaultRealmName string = "Operations"
-)
-
-var (
-	DefaultHostname string = fmt.Sprintf("https://127.0.0.1:%s", kube.DefaultLocalPort)
+	Name string = "ssolo"
 )
 
 // Opt is configuration option for the application State
@@ -34,41 +25,27 @@ type CLIOpt func(a *State) *cobra.Command
 type State struct {
 	*core.API
 
-	// KeycloakClient is the Keycloak API client used to manage its' resources
-	// Keycloak *gocloak.GoCloak
+	// Keycloak is the Keycloak API client used to manage its resources. Commands that talk to
+	// Keycloak set it up when they connect, since where Keycloak is and how it's reached are
+	// command-line flags.
 	Keycloak *keycloak.Client
 }
 
 // New creates a newly initialized instance of the State type
 func New(opts ...Opt) (*State, error) {
-	var err error
-
 	platf, err := fs.Paths(fs.WithAppName(Name))
 	if err != nil {
 		return nil, err
 	}
 
-	lgr := log.New()
-	defer func() {
-		err = lgr.Sync()
-	}()
-	if err != nil {
-		return nil, err
-	}
+	// standard output carries data - e.g. the credentials `client apply --output stdout` prints -
+	// so diagnostics go to standard error
+	lgr := log.New(log.WithOutputPaths("stderr"))
 
 	exec, err := proc.NewExecutor(proc.WithInheritedEnv())
 	if err != nil {
 		return nil, err
 	}
-
-	kec := keycloak.New(
-		DefaultHostname,
-		keycloak.WithAuthPath(getAuthPath(platf.Cache)),
-		keycloak.WithInsecureTLS(true), // TODO(MVProwess): remove this to improve security
-		keycloak.WithRealm("master"),
-	)
-
-	stamps := stamp.New()
 
 	a := &State{
 		API: &core.API{
@@ -76,9 +53,8 @@ func New(opts ...Opt) (*State, error) {
 			Exec:  exec,
 			Log:   lgr,
 			Paths: platf,
-			Stamp: stamps,
+			Stamp: stamp.New(),
 		},
-		Keycloak: kec,
 	}
 
 	// (re-)configure if the user wants to do so
@@ -87,6 +63,11 @@ func New(opts ...Opt) (*State, error) {
 	}
 
 	return a, nil
+}
+
+// AuthPath is where the Keycloak access and refresh tokens are persisted between invocations.
+func (a *State) AuthPath() string {
+	return getAuthPath(a.Paths.Cache)
 }
 
 func getAuthPath(baseDir string) string {
