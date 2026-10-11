@@ -32,16 +32,30 @@ alias(
 
 go_test(
     name = "bridge_test",
-    srcs = ["bridge_test.go"],
+    # the end-to-end test starts a k3s cluster, which takes a minute or two
+    size = "large",
+    srcs = [
+        "bridge_test.go",
+        "e2e_test.go",
+    ],
+    data = ["//cmd/gopskit-bridge:tarball"],
     embed = [":bridge"],
+    env = {"GOPSKIT_BRIDGE_IMAGE_TAR": "$(rootpath //cmd/gopskit-bridge:tarball)"},
+    # needs the Docker daemon; skips itself when there is none (e.g. macOS CI runners)
+    tags = ["requires-network"],
     deps = [
+        "//pkg/bridge/socks5",
+        "//pkg/kube",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
+        "@com_github_testcontainers_testcontainers_go//:testcontainers-go",
+        "@com_github_testcontainers_testcontainers_go_modules_k3s//:k3s",
         "@io_k8s_api//apps/v1:apps",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_api//networking/v1:networking",
         "@io_k8s_apimachinery//pkg/api/errors",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/labels",
         "@io_k8s_client_go//kubernetes/fake",
     ],
 )

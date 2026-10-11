@@ -110,6 +110,14 @@ oci_load(
     repo_tags = ["gopskit-bridge:dev"],
 )
 
+# the same image as a docker-format tarball, which the k3s end-to-end tests import into the cluster
+filegroup(
+    name = "tarball",
+    srcs = [":load"],
+    output_group = "tarball",
+    visibility = ["//pkg/bridge:__pkg__"],
+)
+
 # the release workflow passes the version tags at runtime: bazel run :push -- --tag 1.2.3
 oci_push(
     name = "push",

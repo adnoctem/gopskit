@@ -33,6 +33,8 @@ use_repo(
     "com_github_spf13_cobra",
     "com_github_spf13_pflag",
     "com_github_stretchr_testify",
+    "com_github_testcontainers_testcontainers_go",
+    "com_github_testcontainers_testcontainers_go_modules_k3s",
     "com_github_vmware_labs_yaml_jsonpath",
     "in_gopkg_yaml_v3",
     "io_k8s_api",
