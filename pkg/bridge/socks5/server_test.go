@@ -377,3 +377,28 @@ func TestClientDialReportsRefusal(t *testing.T) {
 	asrt.Equal(ReplyNotAllowed, replyErr.Code)
 	asrt.Contains(err.Error(), "not allowed")
 }
+
+// slowFailingDialer fails after a delay, like a destination whose DNS lookup times out.
+type slowFailingDialer struct{ delay time.Duration }
+
+func (d slowFailingDialer) DialContext(ctx context.Context, _, _ string) (net.Conn, error) {
+	select {
+	case <-time.After(d.delay):
+		return nil, &net.DNSError{Err: "i/o timeout", Name: "slow.svc", IsTimeout: true}
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// A dial that outlasts the handshake timeout must still be answered with a reply code. The
+// handshake timeout bounds how long a client may take to send its request, not how long the
+// server may take to reach the destination - otherwise a slow DNS lookup reaches the client as
+// a bare EOF instead of an error it can report.
+func TestSlowDialStillGetsReply(t *testing.T) {
+	addr := startServer(t, &Server{
+		Dialer:           slowFailingDialer{delay: 300 * time.Millisecond},
+		HandshakeTimeout: 100 * time.Millisecond,
+	})
+
+	assert.Equal(t, ReplyHostUnreachable, rawConnect(t, addr, "slow.svc", 443))
+}

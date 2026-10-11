@@ -178,10 +178,17 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 		return
 	}
 
+	// the handshake deadline bounds the client, not the server: lift it while dialling, which
+	// has its own timeout, and give the reply a fresh one - otherwise a slow DNS lookup leaves no
+	// time to answer and the client sees a bare EOF instead of an error
+	_ = conn.SetDeadline(time.Time{})
+
 	target := net.JoinHostPort(host, strconv.Itoa(port))
 	dialCtx, cancel := context.WithTimeout(ctx, DefaultDialTimeout)
 	upstream, err := s.dialer().DialContext(dialCtx, "tcp", target)
 	cancel()
+
+	_ = conn.SetWriteDeadline(time.Now().Add(timeout))
 	if err != nil {
 		s.infof("connect %s -> %s failed: %v", conn.RemoteAddr(), target, err)
 		_ = writeReply(conn, replyFor(err), nil)
@@ -199,7 +206,7 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	}
 
 	// the handshake is over; the tunnel lives as long as both sides want it to
-	_ = conn.SetDeadline(time.Time{})
+	_ = conn.SetWriteDeadline(time.Time{})
 	s.infof("connect %s -> %s", conn.RemoteAddr(), target)
 
 	relay(conn, upstream)
