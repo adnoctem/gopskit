@@ -17,7 +17,6 @@ import (
 
 const (
 	DefaultNamespace = "default"
-	DefaultLocalPort = "7150"
 )
 
 type Client struct {
@@ -26,9 +25,6 @@ type Client struct {
 
 	// Executor is the connection between local and remote IO streams
 	Executor RemoteExecutor
-
-	// PortForwarder is the implementation for the port-forward functionality
-	PortForwarder PortForwarder
 
 	// Namespace is the Kubernetes namespace the client is configured to access
 	namespace string
@@ -57,8 +53,7 @@ func NewClient(opts ...Opt) (*Client, error) {
 	var err error
 
 	kc := &Client{
-		Executor:      &DefaultRemoteExecutor{},
-		PortForwarder: &DefaultPortForwarder{},
+		Executor: &DefaultRemoteExecutor{},
 	}
 
 	for _, opt := range opts {

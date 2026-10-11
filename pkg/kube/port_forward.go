@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"sync"
 
-	"github.com/adnoctem/gopskit/pkg/proc"
 	corev1 "k8s.io/api/core/v1"
 
 	// client-go's portforward.NewOnAddresses/NewFallbackDialer/NewSPDYOverWebsocketDialer still
@@ -19,80 +18,6 @@ import (
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 )
-
-type PortForwarder interface {
-	ForwardPorts(method string, restConfig *rest.Config, url *url.URL, ports []string, stopChan,
-		readyChan chan struct{}) error
-}
-
-type DefaultPortForwarder struct{}
-
-func (*DefaultPortForwarder) ForwardPorts(method string, restConfig *rest.Config, url *url.URL, ports []string, stopChan,
-	readyChan chan struct{}) error {
-	var err error
-
-	dialer, err := createDialer(method, url, restConfig)
-	if err != nil {
-		return err
-	}
-
-	// client-go writes a line per connection from that connection's own goroutine, so the
-	// writers must be safe for concurrent use; nothing reads them, hence io.Discard
-	pf, err := portforward.NewOnAddresses(
-		dialer,
-		[]string{"localhost"},
-		ports,
-		stopChan,
-		readyChan,
-		io.Discard,
-		io.Discard,
-	)
-	if err != nil {
-		return err
-	}
-
-	return pf.ForwardPorts()
-}
-
-// PortForward port-forwards a remote port of a Kubernetes container to the local machine
-func (c *Client) PortForward(ctx context.Context, pod corev1.Pod, readyChan chan struct{}) error {
-	if pod.Status.Phase != corev1.PodRunning {
-		return fmt.Errorf("unable to forward port of a non-running Pod. current status: %v", pod.Status.Phase)
-	}
-
-	// create control channels
-	stopChan := make(chan struct{})
-	nctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// allow CTRL+C
-	go proc.AwaitCancel(func() int {
-		cancel()
-		return 0
-	})
-
-	go func() {
-		<-nctx.Done()
-		close(stopChan)
-	}()
-
-	req := c.Client.CoreV1().
-		RESTClient().
-		Post().
-		Resource("pods").
-		Namespace(pod.Namespace).
-		Name(pod.Name).
-		SubResource("portforward")
-
-	return c.PortForwarder.ForwardPorts(
-		"POST",
-		c.Config,
-		req.URL(),
-		BuildDefaultPortMap(pod.Spec.Containers[0].Ports[0].ContainerPort),
-		stopChan,
-		readyChan,
-	)
-}
 
 func createDialer(method string, url *url.URL, restConfig *rest.Config) (httpstream.Dialer, error) {
 	var dialer httpstream.Dialer
@@ -114,11 +39,6 @@ func createDialer(method string, url *url.URL, restConfig *rest.Config) (httpstr
 	})
 
 	return dialer, nil
-}
-
-// only require remoteport as input
-func BuildDefaultPortMap(remotePort int32) []string {
-	return []string{fmt.Sprintf("%s:%d", DefaultLocalPort, remotePort)}
 }
 
 // Forward is an open port-forward to a single Pod port, bound to a random free port on the local
@@ -174,7 +94,8 @@ func (c *Client) Forward(ctx context.Context, pod corev1.Pod, remotePort int) (*
 	f := &Forward{stop: make(chan struct{}), done: make(chan error, 1)}
 	ready := make(chan struct{})
 
-	// see DefaultPortForwarder.ForwardPorts for why the output is discarded
+	// client-go writes a line per connection from that connection's own goroutine, so the
+	// writers must be safe for concurrent use; nothing reads them, hence io.Discard
 	pf, err := portforward.NewOnAddresses(
 		dialer,
 		[]string{"127.0.0.1"},
