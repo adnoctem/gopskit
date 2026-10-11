@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/adnoctem/gopskit/internal/bridgecmd"
 	"github.com/adnoctem/gopskit/internal/waltr/app"
 	"github.com/spf13/cobra"
 )
@@ -44,6 +45,12 @@ func NewRootCommand(waltr *app.State) *cobra.Command {
 
 			return nil
 		},
+		// subcommands that need the cluster get the client here; the proxy group overrides this
+		// hook and creates the client only when it needs it
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			_, err := waltr.KubeClient()
+			return err
+		},
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
 		},
@@ -59,6 +66,13 @@ func NewRootCommand(waltr *app.State) *cobra.Command {
 	for _, opt := range Commands {
 		cmd.AddCommand(opt(waltr))
 	}
+
+	cmd.AddCommand(bridgecmd.NewProxyCommand(bridgecmd.Options{
+		CLI:     app.Name,
+		Version: waltr.Stamp.Version,
+		Kube:    waltr.KubeClient,
+		Log:     waltr.Log,
+	}))
 
 	return cmd
 }

@@ -68,18 +68,12 @@ func New(opts ...Opt) (*State, error) {
 		keycloak.WithRealm("master"),
 	)
 
-	kc, err := kube.NewClient()
-	if err != nil {
-		return nil, fmt.Errorf("could not create kubernetes client: %v", err)
-	}
-
 	stamps := stamp.New()
 
 	a := &State{
 		API: &core.API{
 			Name:  Name,
 			Exec:  exec,
-			Kube:  kc,
 			Log:   lgr,
 			Paths: platf,
 			Stamp: stamps,

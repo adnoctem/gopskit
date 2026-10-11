@@ -55,11 +55,6 @@ func New(opts ...Opt) (*State, error) {
 		return nil, err
 	}
 
-	kc, err := kube.NewClient()
-	if err != nil {
-		return nil, fmt.Errorf("could not create kubernetes client: %v", err)
-	}
-
 	// enforce HTTPS
 	host := fmt.Sprintf("https://127.0.0.1:%s", kube.DefaultLocalPort)
 	vc := apivault.New(host, apivault.WithTimeout(60*time.Second), apivault.WithInsecureTLS(true))
@@ -69,7 +64,6 @@ func New(opts ...Opt) (*State, error) {
 		API: &core.API{
 			Name:  Name,
 			Exec:  exec,
-			Kube:  kc,
 			Log:   lgr,
 			Paths: platf,
 			Stamp: stamps,

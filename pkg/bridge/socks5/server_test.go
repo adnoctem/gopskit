@@ -327,3 +327,53 @@ func rawConnect(t *testing.T, addr, host string, port int) byte {
 
 	return readReply(t, conn)
 }
+
+func TestClientDialThroughServer(t *testing.T) {
+	asrt := assert.New(t)
+
+	backend, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = backend.Close() })
+	go func() {
+		c, err := backend.Accept()
+		if err != nil {
+			return
+		}
+		defer func() { _ = c.Close() }()
+		_, _ = io.Copy(c, c)
+	}()
+
+	dialer := &recordingDialer{target: backend.Addr().String()}
+	addr := startServer(t, &Server{Dialer: dialer})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	require.NoError(t, Greet(ctx, addr))
+
+	conn, err := Dial(ctx, addr, "vault.vault.svc:8200")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+
+	_, err = conn.Write([]byte("ping"))
+	require.NoError(t, err)
+	got := make([]byte, 4)
+	_, err = io.ReadFull(conn, got)
+	require.NoError(t, err)
+
+	asrt.Equal("ping", string(got), "data must flow through the tunnel in both directions")
+	asrt.Equal([]string{"vault.vault.svc:8200"}, dialer.addresses())
+}
+
+func TestClientDialReportsRefusal(t *testing.T) {
+	asrt := assert.New(t)
+
+	addr := startServer(t, &Server{Allow: func(string, int) bool { return false }})
+
+	_, err := Dial(context.Background(), addr, "vault.vault.svc:8200")
+
+	var replyErr *ReplyError
+	require.ErrorAs(t, err, &replyErr)
+	asrt.Equal(ReplyNotAllowed, replyErr.Code)
+	asrt.Contains(err.Error(), "not allowed")
+}

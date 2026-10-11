@@ -1,0 +1,47 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "bridge",
+    srcs = [
+        "bridge.go",
+        "manifests.go",
+    ],
+    importpath = "github.com/adnoctem/gopskit/pkg/bridge",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/bridge/socks5",
+        "//pkg/kube",
+        "@io_k8s_api//apps/v1:apps",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_api//networking/v1:networking",
+        "@io_k8s_apimachinery//pkg/api/errors",
+        "@io_k8s_apimachinery//pkg/api/resource",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/labels",
+        "@io_k8s_apimachinery//pkg/util/intstr",
+        "@io_k8s_client_go//kubernetes",
+        "@io_k8s_utils//ptr",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":bridge",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "bridge_test",
+    srcs = ["bridge_test.go"],
+    embed = [":bridge"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@io_k8s_api//apps/v1:apps",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_api//networking/v1:networking",
+        "@io_k8s_apimachinery//pkg/api/errors",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_client_go//kubernetes/fake",
+    ],
+)

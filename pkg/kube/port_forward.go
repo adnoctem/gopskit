@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"github.com/adnoctem/gopskit/pkg/proc"
 	corev1 "k8s.io/api/core/v1"
@@ -117,4 +118,101 @@ func createDialer(method string, url *url.URL, restConfig *rest.Config) (httpstr
 // only require remoteport as input
 func BuildDefaultPortMap(remotePort int32) []string {
 	return []string{fmt.Sprintf("%s:%d", DefaultLocalPort, remotePort)}
+}
+
+// Forward is an open port-forward to a single Pod port, bound to a random free port on the local
+// loopback interface. Unlike PortForward it never blocks the caller beyond establishing the
+// tunnel, and installs no signal handling of its own.
+type Forward struct {
+	// LocalPort is the port on 127.0.0.1 that reaches the Pod
+	LocalPort uint16
+
+	stop chan struct{}
+	once sync.Once
+	done chan error
+}
+
+// Close tears the port-forward down and waits for it to finish. It is safe to call more than once.
+func (f *Forward) Close() error {
+	f.once.Do(func() { close(f.stop) })
+
+	err, ok := <-f.done
+	if !ok {
+		return nil
+	}
+
+	return err
+}
+
+// Done is closed when the port-forward ends, e.g. because the Pod went away.
+func (f *Forward) Done() <-chan error {
+	return f.done
+}
+
+// Forward opens a port-forward from a random free local port to remotePort on pod. It returns
+// once the tunnel is ready, or with an error if it could not be established before ctx ended.
+func (c *Client) Forward(ctx context.Context, pod corev1.Pod, remotePort int) (*Forward, error) {
+	if pod.Status.Phase != corev1.PodRunning {
+		return nil, fmt.Errorf("unable to forward port of a non-running Pod %s/%s. current status: %v",
+			pod.Namespace, pod.Name, pod.Status.Phase)
+	}
+
+	req := c.Client.CoreV1().
+		RESTClient().
+		Post().
+		Resource("pods").
+		Namespace(pod.Namespace).
+		Name(pod.Name).
+		SubResource("portforward")
+
+	dialer, err := createDialer("POST", req.URL(), c.Config)
+	if err != nil {
+		return nil, err
+	}
+
+	f := &Forward{stop: make(chan struct{}), done: make(chan error, 1)}
+	ready := make(chan struct{})
+
+	var stdOut, stdErr bytes.Buffer
+	pf, err := portforward.NewOnAddresses(
+		dialer,
+		[]string{"127.0.0.1"},
+		[]string{fmt.Sprintf("0:%d", remotePort)},
+		f.stop,
+		ready,
+		&stdOut,
+		&stdErr,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		defer close(f.done)
+
+		if err := pf.ForwardPorts(); err != nil {
+			f.done <- err
+		}
+	}()
+
+	select {
+	case <-ready:
+	case err := <-f.done:
+		if err == nil {
+			err = fmt.Errorf("port-forward to %s/%s ended before it became ready", pod.Namespace, pod.Name)
+		}
+		return nil, err
+	case <-ctx.Done():
+		_ = f.Close()
+		return nil, ctx.Err()
+	}
+
+	ports, err := pf.GetPorts()
+	if err != nil || len(ports) != 1 {
+		_ = f.Close()
+		return nil, fmt.Errorf("could not determine the local port of the port-forward: %v", err)
+	}
+	f.LocalPort = ports[0].Local
+
+	return f, nil
 }

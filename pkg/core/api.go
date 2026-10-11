@@ -1,6 +1,9 @@
 package core
 
 import (
+	"fmt"
+	"sync"
+
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
 	"github.com/adnoctem/gopskit/pkg/kube"
 	"github.com/adnoctem/gopskit/pkg/log"
@@ -20,7 +23,8 @@ type API struct {
 	Exec *proc.Executor
 
 	// Kube is a Kubernetes Client capable of performing all Kubernetes
-	// operations, initialized from the same sources as `kubectl`
+	// operations, initialized from the same sources as `kubectl`. Applications that create it
+	// lazily populate it through KubeClient before a command runs.
 	Kube *kube.Client
 
 	// Platform is a utility object performing OS-specific lookups and other
@@ -39,4 +43,25 @@ type API struct {
 	// by LD. Our Bazel builds stamps builds via LD using the 'x_defs' attribute
 	// on the 'go_library' rule
 	Stamp *stamp.Stamps
+
+	kubeOnce sync.Once
+	kubeErr  error
+}
+
+// KubeClient returns Kube, creating it on first use from the same sources as `kubectl`. Creating
+// the client lazily lets commands that never touch the cluster - help output, or reaching a
+// service directly - run without a kubeconfig.
+func (a *API) KubeClient() (*kube.Client, error) {
+	a.kubeOnce.Do(func() {
+		if a.Kube != nil {
+			return
+		}
+
+		a.Kube, a.kubeErr = kube.NewClient()
+		if a.kubeErr != nil {
+			a.kubeErr = fmt.Errorf("could not create kubernetes client: %w", a.kubeErr)
+		}
+	})
+
+	return a.Kube, a.kubeErr
 }

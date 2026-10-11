@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/adnoctem/gopskit/internal/bridgecmd"
 	"github.com/adnoctem/gopskit/internal/ssolo/app"
 	"github.com/spf13/cobra"
 )
@@ -33,6 +34,12 @@ func NewRootCommand(ssolo *app.State) *cobra.Command {
 
 			return nil
 		},
+		// subcommands that need the cluster get the client here; the proxy group overrides this
+		// hook and creates the client only when it needs it
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			_, err := ssolo.KubeClient()
+			return err
+		},
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
 		},
@@ -44,6 +51,13 @@ func NewRootCommand(ssolo *app.State) *cobra.Command {
 	for _, opt := range Commands {
 		cmd.AddCommand(opt(ssolo))
 	}
+
+	cmd.AddCommand(bridgecmd.NewProxyCommand(bridgecmd.Options{
+		CLI:     app.Name,
+		Version: ssolo.Stamp.Version,
+		Kube:    ssolo.KubeClient,
+		Log:     ssolo.Log,
+	}))
 
 	return cmd
 }

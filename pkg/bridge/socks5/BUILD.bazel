@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "socks5",
-    srcs = ["server.go"],
+    srcs = [
+        "client.go",
+        "server.go",
+    ],
     importpath = "github.com/adnoctem/gopskit/pkg/bridge/socks5",
     visibility = ["//visibility:public"],
     deps = ["//pkg/log"],

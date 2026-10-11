@@ -15,6 +15,7 @@ go_library(
     importpath = "github.com/adnoctem/gopskit/internal/waltr/cmd",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/bridgecmd",
         "//internal/waltr/app",
         "//internal/waltr/util",
         "//pkg/api/vault",

@@ -19,7 +19,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -110,36 +109,13 @@ func probe(args []string) int {
 	timeout := fs.Duration("timeout", 2*time.Second, "how long to wait for the server")
 	_ = fs.Parse(args)
 
-	if err := greet(net.JoinHostPort("127.0.0.1", strconv.Itoa(*port)), *timeout); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+
+	if err := socks5.Greet(ctx, net.JoinHostPort("127.0.0.1", strconv.Itoa(*port))); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "probe failed: %v\n", err)
 		return 1
 	}
 
 	return 0
-}
-
-// greet completes a SOCKS5 method negotiation, which proves the server is accepting and
-// answering, without asking it to connect anywhere.
-func greet(addr string, timeout time.Duration) error {
-	conn, err := net.DialTimeout("tcp", addr, timeout)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = conn.Close() }()
-
-	_ = conn.SetDeadline(time.Now().Add(timeout))
-	if _, err := conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
-		return err
-	}
-
-	var resp [2]byte
-	if _, err := io.ReadFull(conn, resp[:]); err != nil {
-		return err
-	}
-
-	if resp != [2]byte{0x05, 0x00} {
-		return fmt.Errorf("unexpected greeting response %#v", resp)
-	}
-
-	return nil
 }
