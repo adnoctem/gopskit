@@ -3,8 +3,10 @@
 package vault
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/adnoctem/gopskit/pkg/api"
@@ -90,6 +92,9 @@ type Client struct {
 
 	// tls holds the TLS settings applied to the underlying HTTP client at construction time
 	tls vault.TLSConfiguration
+
+	// transport, when set, carries every request - e.g. through the gopskit bridge
+	transport *http.Transport
 }
 
 // ClientOpt configures a Client during New
@@ -115,6 +120,16 @@ func New(host string, opts ...ClientOpt) *Client {
 	if c.timeout != 0 {
 		vaultOpts = append(vaultOpts, vault.WithRequestTimeout(c.timeout))
 	}
+	if c.transport != nil {
+		// the SDK applies its TLS settings onto the transport's existing TLS config
+		if c.transport.TLSClientConfig == nil {
+			c.transport.TLSClientConfig = &tls.Config{}
+		}
+
+		hc := vault.DefaultConfiguration().HTTPClient
+		hc.Transport = c.transport
+		vaultOpts = append(vaultOpts, vault.WithHTTPClient(hc))
+	}
 
 	client, err := vault.New(vaultOpts...)
 	if err != nil {
@@ -129,6 +144,15 @@ func New(host string, opts ...ClientOpt) *Client {
 func WithTimeout(d time.Duration) ClientOpt {
 	return func(c *Client) error {
 		c.timeout = d
+		return nil
+	}
+}
+
+// WithTransport sends every request through t, e.g. one reaching Vault through the gopskit
+// bridge. The client's TLS settings are applied to it.
+func WithTransport(t *http.Transport) ClientOpt {
+	return func(c *Client) error {
+		c.transport = t
 		return nil
 	}
 }
