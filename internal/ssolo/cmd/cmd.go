@@ -11,7 +11,6 @@ var (
 	// Commands is a slice of CLIOpt options for subcommands of the 'ssolo' CLI
 	Commands = []app.CLIOpt{
 		NewInitCommand,
-		NewGitLabCommand,
 	}
 )
 

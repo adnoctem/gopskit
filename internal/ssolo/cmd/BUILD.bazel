@@ -4,7 +4,6 @@ go_library(
     name = "cmd",
     srcs = [
         "cmd.go",
-        "gitlab.go",
         "init.go",
     ],
     importpath = "github.com/adnoctem/gopskit/internal/ssolo/cmd",
