@@ -6,7 +6,7 @@ go_library(
     importpath = "github.com/adnoctem/gopskit/cmd/waltr",
     visibility = ["//visibility:private"],
     x_defs = {
-        "github.com/adnoctem/gopskit/pkg/stamp.Version": module_version(),
+        "github.com/adnoctem/gopskit/pkg/stamp.Version": "{STABLE_GOPSKIT_VERSION}",
         "github.com/adnoctem/gopskit/pkg/stamp.BuildDate": "{BUILD_DATE}",
         "github.com/adnoctem/gopskit/pkg/stamp.CommitSHA": "{GIT_COMMIT_SHA}",
         "github.com/adnoctem/gopskit/pkg/stamp.Branch": "{GIT_BRANCH}",
