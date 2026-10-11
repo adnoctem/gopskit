@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -221,10 +222,14 @@ func (o *clientOutput) validate(clientID string) error {
 		if o.vaultPath == "" {
 			o.vaultPath = clientID + "/credentials/oidc"
 		}
-		// the Vault client exits the process on an unreadable CA file, so check them up front
+		// the Vault client exits the process on a bad CA file, so check them up front
 		for _, ca := range o.vaultCACerts {
-			if _, err := os.Stat(ca); err != nil {
+			raw, err := os.ReadFile(ca)
+			if err != nil {
 				return fmt.Errorf("--vault-ca-cert: %w", err)
+			}
+			if !x509.NewCertPool().AppendCertsFromPEM(raw) {
+				return fmt.Errorf("--vault-ca-cert: %s holds no PEM certificate", ca)
 			}
 		}
 	}
