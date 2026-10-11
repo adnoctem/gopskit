@@ -98,6 +98,12 @@ func (c *Client) PoliciesListAclPolicies(ctx context.Context) ([]string, error) 
 		return nil, err
 	}
 
+	// LIST sys/policies/acl answers with "keys"; "policies" is what the older sys/policy
+	// endpoint uses, so accept either
+	if len(resp.Data.Keys) > 0 {
+		return resp.Data.Keys, nil
+	}
+
 	return resp.Data.Policies, nil
 }
 

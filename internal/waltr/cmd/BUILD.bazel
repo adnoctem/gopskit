@@ -1,10 +1,11 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "cmd",
     srcs = [
         "cmd.go",
         "configure.go",
+        "connect.go",
         "init.go",
         "mounts.go",
         "prepare.go",
@@ -19,9 +20,9 @@ go_library(
         "//internal/waltr/app",
         "//internal/waltr/util",
         "//pkg/api/vault",
+        "//pkg/config",
         "//pkg/core",
         "//pkg/helpers",
-        "//pkg/proc",
         "//pkg/tools",
         "@com_github_hashicorp_hcl_v2//gohcl",
         "@com_github_hashicorp_hcl_v2//hclparse",
@@ -36,4 +37,26 @@ alias(
     name = "go_default_library",
     actual = ":cmd",
     visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "cmd_test",
+    # the command tests run Vault in containers, skipping themselves when there is no Docker daemon
+    size = "large",
+    srcs = ["cmd_test.go"],
+    embed = [":cmd"],
+    tags = ["requires-network"],
+    deps = [
+        "//internal/waltr/app",
+        "//internal/waltr/util",
+        "//pkg/api/vault",
+        "//pkg/api/vault/vaulttest",
+        "//pkg/core",
+        "//pkg/kube",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_client_go//kubernetes/fake",
+    ],
 )

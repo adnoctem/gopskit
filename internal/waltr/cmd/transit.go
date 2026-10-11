@@ -8,9 +8,7 @@ import (
 	"github.com/adnoctem/gopskit/internal/waltr/app"
 	"github.com/adnoctem/gopskit/internal/waltr/util"
 	apivault "github.com/adnoctem/gopskit/pkg/api/vault"
-	"github.com/adnoctem/gopskit/pkg/core"
 	"github.com/adnoctem/gopskit/pkg/helpers"
-	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +17,7 @@ var _ app.CLIOpt = NewTransitCommand // assure type compatibility
 
 func NewTransitCommand(app *app.State) *cobra.Command {
 	var (
-		token     string
+		vf        vaultFlags
 		overwrite bool
 	)
 
@@ -30,43 +28,16 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 		Long:             "Configure Vault for Transit-Encryption with the Vault-Secrets-Operator",
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			envF := proc.Must(cmd.Flags().GetString("environment"))
-			label := proc.Must(cmd.Flags().GetString("label"))
-			environment := proc.Must(core.EnvFromString(envF))
-
-			pods, err := util.Pods(app, "", label)
+			environment, err := environmentOf(cmd)
 			if err != nil {
-				return fmt.Errorf("could not retrieve Vault pods for label: %s. Error: %v", label, err)
+				return err
 			}
 
-			if token == "" {
-				creds, err := util.ReadCredentials(app, environment)
-				if err != nil {
-					msg := fmt.Errorf("token option is unset and could not read credentials: %w", err)
-					app.Log.Error(msg)
-					return err
-				}
-
-				token = creds.Token
+			release, err := vf.connect(cmd.Context(), app, vf.addr, environment)
+			if err != nil {
+				return err
 			}
-
-			// port-forward the (leader)
-			app.Log.Infof("Port-forwarding Vault instance: %s", pods[0].Name)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			readyChan := make(chan struct{})
-			go func(rc chan struct{}) {
-				err := app.Kube.PortForward(ctx, pods[0], rc)
-				if err != nil {
-					panic(err)
-				}
-			}(readyChan)
-			<-readyChan
-
-			// add token
-			if err := app.Vault.SetToken(&apivault.Credentials{Token: token}); err != nil {
-				return fmt.Errorf("could not set token: %v", err)
-			}
+			defer release()
 
 			s, err := util.SecretsEngines(app)
 			if err != nil {
@@ -171,8 +142,8 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().BoolVar(&overwrite, "overwrite", false, "Overwrite existing configuration")
-	cmd.PersistentFlags().StringVarP(&token, "token", "t", "", "The Vault root token")
+	vf.add(cmd, true)
+	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "Overwrite existing configuration")
 
 	return cmd
 }

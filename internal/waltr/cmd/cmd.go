@@ -5,6 +5,7 @@ import (
 
 	"github.com/adnoctem/gopskit/internal/bridgecmd"
 	"github.com/adnoctem/gopskit/internal/waltr/app"
+	"github.com/adnoctem/gopskit/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +27,10 @@ var (
 )
 
 func NewRootCommand(waltr *app.State) *cobra.Command {
+	// run every persistent pre-run hook from the root down, so the configuration file still
+	// loads under subcommands with hooks of their own, such as the proxy group
+	cobra.EnableTraverseRunHooks = true
+
 	var (
 		environment string
 		label       string
@@ -45,11 +50,10 @@ func NewRootCommand(waltr *app.State) *cobra.Command {
 
 			return nil
 		},
-		// subcommands that need the cluster get the client here; the proxy group overrides this
-		// hook and creates the client only when it needs it
-		PersistentPreRunE: func(*cobra.Command, []string) error {
-			_, err := waltr.KubeClient()
-			return err
+		// every flag can also come from the environment (where bound) or the configuration file;
+		// commands that need the cluster create its client themselves
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			return config.Load(app.Name, cmd)
 		},
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
@@ -61,18 +65,16 @@ func NewRootCommand(waltr *app.State) *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&label, "label", "l", app.DefaultLabel, "The Kubernetes label to filter resources by")
 	cmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", "",
 		"The Kubernetes namespace to use. None equates to checking the entire cluster.")
+	cmd.PersistentFlags().StringVar(&waltr.CredentialFile, "credential-file", "",
+		"Where 'waltr init' stores the root token and keys, and other commands read them (default: per --environment in the cache directory)")
+	config.AddFlag(cmd, app.Name)
 
 	// add subcommands
 	for _, opt := range Commands {
 		cmd.AddCommand(opt(waltr))
 	}
 
-	cmd.AddCommand(bridgecmd.NewProxyCommand(bridgecmd.Options{
-		CLI:     app.Name,
-		Version: waltr.Stamp.Version,
-		Kube:    waltr.KubeClient,
-		Log:     waltr.Log,
-	}))
+	cmd.AddCommand(bridgecmd.NewProxyCommand(bridgeOptions(waltr)))
 
 	return cmd
 }

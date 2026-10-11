@@ -32,16 +32,21 @@ type SealConfig struct {
 // since it most likely is required for later commands. This function make the path deterministic
 // per execution env.Environment.
 func CredentialPath(a *app.State, env core.Environment) string {
+	if a.CredentialFile != "" {
+		return a.CredentialFile
+	}
+
 	return filepath.Join(a.Paths.Cache, env.String(), "vault-credentials.json")
 }
 
 // WriteCredentials persists the given Vault credentials to the CredentialPath for env, and makes
 // them the active token for subsequent Vault API calls.
 func WriteCredentials(a *app.State, env core.Environment, credentials *apivault.Credentials) error {
-	a.Vault.SetAuthPath(CredentialPath(a, env))
+	// SetToken replaces the client's credentials with these, so the path is set afterwards, on them
 	if err := a.Vault.SetToken(credentials); err != nil {
 		return err
 	}
+	a.Vault.SetAuthPath(CredentialPath(a, env))
 
 	return a.Vault.Token().Save()
 }

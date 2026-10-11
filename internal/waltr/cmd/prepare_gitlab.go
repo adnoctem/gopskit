@@ -2,14 +2,10 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/adnoctem/gopskit/internal/waltr/app"
 	"github.com/adnoctem/gopskit/internal/waltr/util"
-	apivault "github.com/adnoctem/gopskit/pkg/api/vault"
-	"github.com/adnoctem/gopskit/pkg/core"
 	"github.com/adnoctem/gopskit/pkg/helpers"
-	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +14,7 @@ var _ app.CLIOpt = NewPrepareGitLabCommand // assure type compatibility
 
 func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 	var (
-		token     string
+		vf        vaultFlags
 		overwrite bool
 	)
 
@@ -28,43 +24,16 @@ func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 		Long:             "Prepare Vault with policies and roles for GitLab",
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			envF := proc.Must(cmd.Flags().GetString("environment"))
-			label := proc.Must(cmd.Flags().GetString("label"))
-			environment := proc.Must(core.EnvFromString(envF))
-
-			pods, err := util.Pods(app, "", label)
+			environment, err := environmentOf(cmd)
 			if err != nil {
-				return fmt.Errorf("could not retrieve Vault pods for label: %s. Error: %v", label, err)
+				return err
 			}
 
-			if token == "" {
-				creds, err := util.ReadCredentials(app, environment)
-				if err != nil {
-					msg := fmt.Errorf("token option is unset and could not read credentials: %w", err)
-					app.Log.Error(msg)
-					return err
-				}
-
-				token = creds.Token
+			release, err := vf.connect(cmd.Context(), app, vf.addr, environment)
+			if err != nil {
+				return err
 			}
-
-			// port-forward the (leader)
-			app.Log.Infof("Port-forwarding Vault instance: %s", pods[0].Name)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			readyChan := make(chan struct{})
-			go func(rc chan struct{}) {
-				err := app.Kube.PortForward(ctx, pods[0], rc)
-				if err != nil {
-					panic(err)
-				}
-			}(readyChan)
-			<-readyChan
-
-			// add token
-			if err := app.Vault.SetToken(&apivault.Credentials{Token: token}); err != nil {
-				return fmt.Errorf("could not set token: %v", err)
-			}
+			defer release()
 
 			// create Kubernetes role
 			const r = "gitlab"
@@ -196,6 +165,7 @@ func NewPrepareGitLabCommand(app *app.State) *cobra.Command {
 		},
 	}
 
-	addPrepareFlags(cmd, &overwrite, &token)
+	vf.add(cmd, true)
+	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "Overwrite existing configuration")
 	return cmd
 }

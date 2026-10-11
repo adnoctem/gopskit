@@ -3,25 +3,23 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/adnoctem/gopskit/internal/waltr/app"
 	cmdutil "github.com/adnoctem/gopskit/internal/waltr/util"
-	apivault "github.com/adnoctem/gopskit/pkg/api/vault"
-	"github.com/adnoctem/gopskit/pkg/core"
 	"github.com/adnoctem/gopskit/pkg/helpers"
-	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/hashicorp/vault-client-go/schema"
 	"github.com/spf13/cobra"
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var _ app.CLIOpt = NewMountsCommand // assure type compatibility
 
 func NewMountsCommand(app *app.State) *cobra.Command {
 	var (
-		token string
+		vf               vaultFlags
+		kubernetesHost   string
+		kubernetesCACert string
 	)
 
 	cmd := &cobra.Command{
@@ -31,64 +29,16 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 		Long:             "Mount Vault's authentication methods and secrets engines",
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			envF := proc.Must(cmd.Flags().GetString("environment"))
-			label := proc.Must(cmd.Flags().GetString("label"))
-			namespace := proc.Must(cmd.Flags().GetString("namespace"))
-			environment := proc.Must(core.EnvFromString(envF))
-
-			var vaultNamespace string
-			var vaultLeaderPod *corev1.Pod
-
-			// look across the entire cluster
-			pods, err := cmdutil.Pods(app, "", label)
-			if err != nil {
-				return fmt.Errorf("could not retrieve Vault pods for label: %s. Error: %v", label, err)
-			}
-
-			// ensure we're using a single namespace, or it's passed in
-			vaultNamespace, err = cmdutil.EnsureNamespace(pods)
-			if err != nil && namespace == "" {
-				return fmt.Errorf("found multiple possible Vault pods. the namespace option is unset and %v", err)
-			}
-
-			// wait until the pod is running
-			vaultLeaderPod, err = cmdutil.LeaderPod(app, pods, vaultNamespace, label)
+			environment, err := environmentOf(cmd)
 			if err != nil {
 				return err
 			}
-			if err := cmdutil.WaitUntilRunning(app, *vaultLeaderPod); err != nil {
+
+			release, err := vf.connect(cmd.Context(), app, vf.addr, environment)
+			if err != nil {
 				return err
 			}
-
-			if token == "" {
-				app.Log.Debug("'token' option is unset, falling back to credentials in cache path!")
-				creds, err := cmdutil.ReadCredentials(app, environment)
-				if err != nil {
-					msg := fmt.Errorf("token option is unset and could not read credentials: %w", err)
-					app.Log.Error(msg)
-					return err
-				}
-
-				token = creds.Token
-			}
-
-			// port-forward the (leader)
-			app.Log.Infof("Port-forwarding Vault instance: %s", pods[0].Name)
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			readyChan := make(chan struct{})
-			go func(rc chan struct{}) {
-				err := app.Kube.PortForward(ctx, pods[0], rc)
-				if err != nil {
-					panic(err)
-				}
-			}(readyChan)
-			<-readyChan
-
-			// add token
-			if err := app.Vault.SetToken(&apivault.Credentials{Token: token}); err != nil {
-				return fmt.Errorf("could not set token: %v", err)
-			}
+			defer release()
 
 			// get current methods
 			m, err := cmdutil.AuthMethods(app)
@@ -99,18 +49,6 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 			// enable Kubernetes
 			const kp = "kubernetes/"
 			if !helpers.SliceContains(m, kp) {
-				// get API server info
-				svc, err := app.Kube.Service("default", "kubernetes", v1.GetOptions{
-					TypeMeta: v1.TypeMeta{
-						APIVersion: "v1",
-						Kind:       "Service",
-					},
-				})
-
-				if err != nil {
-					return fmt.Errorf("could not find Kubernetes API server service")
-				}
-
 				// enable
 				err = app.Vault.AuthEnableMethod(context.Background(), strings.TrimSuffix(kp, "/"),
 					schema.AuthEnableMethodRequest{
@@ -122,11 +60,17 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 					return fmt.Errorf("could not enable Vault authentication method Kubernetes. Error: %v", err)
 				}
 
-				// configure
-				err = app.Vault.KubernetesConfigureAuth(context.Background(), strings.TrimSuffix(kp, "/"),
-					schema.KubernetesConfigureAuthRequest{
-						KubernetesHost: fmt.Sprintf("https://%s:%d", svc.Spec.ClusterIP, svc.Spec.Ports[0].Port),
-					})
+				// configure; inside the cluster Vault finds the API server's CA in its own Pod
+				req := schema.KubernetesConfigureAuthRequest{KubernetesHost: kubernetesHost}
+				if kubernetesCACert != "" {
+					pem, err := os.ReadFile(kubernetesCACert)
+					if err != nil {
+						return fmt.Errorf("--kubernetes-ca-cert: %w", err)
+					}
+					req.KubernetesCaCert = string(pem)
+				}
+
+				err = app.Vault.KubernetesConfigureAuth(context.Background(), strings.TrimSuffix(kp, "/"), req)
 
 				if err != nil {
 					return fmt.Errorf("could not configure Vault authentication method Kubernetes: %v", err)
@@ -189,7 +133,11 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringVarP(&token, "token", "t", "", "The Vault root token")
+	vf.add(cmd, true)
+	cmd.Flags().StringVar(&kubernetesHost, "kubernetes-host", "https://kubernetes.default.svc",
+		"The Kubernetes API server address Vault's Kubernetes auth method uses, as Vault reaches it")
+	cmd.Flags().StringVar(&kubernetesCACert, "kubernetes-ca-cert", "",
+		"A PEM file with the Kubernetes API server's CA, for a Vault running outside the cluster (default: Vault's own Pod's)")
 
 	return cmd
 }

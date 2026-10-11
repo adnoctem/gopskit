@@ -1,9 +1,6 @@
 package app
 
 import (
-	"fmt"
-	"time"
-
 	apivault "github.com/adnoctem/gopskit/pkg/api/vault"
 	"github.com/adnoctem/gopskit/pkg/core"
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
@@ -11,7 +8,6 @@ import (
 	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 
-	"github.com/adnoctem/gopskit/pkg/kube"
 	"github.com/adnoctem/gopskit/pkg/stamp"
 )
 
@@ -29,8 +25,14 @@ type CLIOpt func(a *State) *cobra.Command
 type State struct {
 	*core.API
 
-	// Vault is the gopskit Vault API client, which waltr uses for nearly all of its functionality
+	// Vault is the gopskit Vault API client, which waltr uses for nearly all of its functionality.
+	// Commands set it up when they connect, since where Vault is and how it's reached are
+	// command-line flags.
 	Vault *apivault.Client
+
+	// CredentialFile overrides where the root token and keys from `waltr init` are stored and
+	// read, which is otherwise a path per environment in the cache directory.
+	CredentialFile string
 }
 
 // New creates a newly initialized instance of the State type
@@ -55,9 +57,6 @@ func New(opts ...Opt) (*State, error) {
 		return nil, err
 	}
 
-	// enforce HTTPS
-	host := fmt.Sprintf("https://127.0.0.1:%s", kube.DefaultLocalPort)
-	vc := apivault.New(host, apivault.WithTimeout(60*time.Second), apivault.WithInsecureTLS(true))
 	stamps := stamp.New()
 
 	a := &State{
@@ -68,7 +67,6 @@ func New(opts ...Opt) (*State, error) {
 			Paths: platf,
 			Stamp: stamps,
 		},
-		Vault: vc,
 	}
 
 	// (re-)configure if the user wants to do so

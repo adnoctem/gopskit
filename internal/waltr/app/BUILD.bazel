@@ -9,7 +9,6 @@ go_library(
         "//pkg/api/vault",
         "//pkg/core",
         "//pkg/fsi",
-        "//pkg/kube",
         "//pkg/log",
         "//pkg/proc",
         "//pkg/stamp",
