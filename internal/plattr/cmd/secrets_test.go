@@ -79,6 +79,28 @@ func TestReflection(t *testing.T) {
 	assert.Equal(t, "cert-manager", annotations["reflector.v1.k8s.emberstack.com/reflection-auto-namespaces"])
 }
 
+// Reflector reads an empty namespace list as every namespace, so reflection without namespaces
+// would mirror credentials across the whole cluster.
+func TestReflectionNeedsNamespaces(t *testing.T) {
+	for _, args := range [][]string{
+		{"aws", "--access-key-id", "a", "--secret-access-key", "b"},
+		{"cloudflare", "--token", "t"},
+		{"hetzner-encryption", "--passphrase", "p"},
+		{"longhorn-encryption", "--passphrase", "p"},
+	} {
+		t.Run(args[0], func(t *testing.T) {
+			state := newTestPlattrState()
+
+			err := run(t, state, append(args, "--reflect")...)
+			assert.ErrorContains(t, err, "--reflect-namespaces")
+
+			secrets, kerr := state.Kube.Client.CoreV1().Secrets("").List(t.Context(), metav1.ListOptions{})
+			require.NoError(t, kerr)
+			assert.Empty(t, secrets.Items, "nothing is created when reflection is refused")
+		})
+	}
+}
+
 // A lookup that fails for any reason other than the Secret not existing must be reported, not
 // taken to mean the Secret is missing.
 func TestLookupErrorsAreReported(t *testing.T) {

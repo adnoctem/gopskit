@@ -29,6 +29,10 @@ func NewAWSCommand(app *app.State) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
+			annotations, err := reflectorAnnotations(reflect, reflectNamespaces)
+			if err != nil {
+				return err
+			}
 
 			if accessKeyId == "" || secretAccessKey == "" {
 				return errors.New("cannot create AWS Secret without credentials")
@@ -42,7 +46,7 @@ func NewAWSCommand(app *app.State) *cobra.Command {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "aws-credentials",
 					Namespace:   namespace,
-					Annotations: reflectorAnnotations(reflect, reflectNamespaces),
+					Annotations: annotations,
 				},
 				Type: "Opaque",
 				Data: map[string][]byte{
@@ -60,15 +64,7 @@ func NewAWSCommand(app *app.State) *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&overwrite, "overwrite", false, "Replace an existing Secret, e.g. to rotate the credentials")
 	config.BindEnv(cmd.PersistentFlags(), "access-key-id", "AWS_ACCESS_KEY_ID")
 	config.BindEnv(cmd.PersistentFlags(), "secret-access-key", "AWS_SECRET_ACCESS_KEY")
-	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", []string{
-		"kube-system",
-		"vault",
-		"keycloak",
-		"gitlab",
-		"harbor",
-		"awx",
-		"matomo"},
-		"Namespaces to enable for reflection")
+	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", nil, "Namespaces to mirror the Secret into with --reflect")
 
 	return cmd
 }

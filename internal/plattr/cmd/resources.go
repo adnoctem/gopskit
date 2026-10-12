@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -14,10 +15,14 @@ import (
 )
 
 // reflectorAnnotations are the annotations that have emberstack's Reflector mirror a Secret into
-// namespaces, or none when reflect is false.
-func reflectorAnnotations(reflect bool, namespaces []string) map[string]string {
+// namespaces, or none when reflect is false. Reflection needs the namespaces named: Reflector reads
+// an empty list as every namespace, which is no place for credentials.
+func reflectorAnnotations(reflect bool, namespaces []string) (map[string]string, error) {
 	if !reflect {
-		return map[string]string{}
+		return map[string]string{}, nil
+	}
+	if len(namespaces) == 0 {
+		return nil, errors.New("--reflect needs the namespaces to mirror the Secret into: give --reflect-namespaces")
 	}
 
 	ns := strings.Join(namespaces, ",")
@@ -26,7 +31,7 @@ func reflectorAnnotations(reflect bool, namespaces []string) map[string]string {
 		"reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": ns,
 		"reflector.v1.k8s.emberstack.com/reflection-auto-enabled":       "true",
 		"reflector.v1.k8s.emberstack.com/reflection-auto-namespaces":    ns,
-	}
+	}, nil
 }
 
 // secretExists reports whether the Secret exists. Only "not found" counts as missing: any other

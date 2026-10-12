@@ -37,6 +37,10 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
+			annotations, err := reflectorAnnotations(reflect, reflectNamespaces)
+			if err != nil {
+				return err
+			}
 
 			if generatePassphrase && passphrase != "" {
 				return errors.New("--generate-passphrase and a given passphrase exclude each other")
@@ -68,7 +72,7 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "longhorn-crypto",
 					Namespace:   namespace,
-					Annotations: reflectorAnnotations(reflect, reflectNamespaces),
+					Annotations: annotations,
 					Labels: map[string]string{
 						"component": "longhorn",
 						"use":       "encryption",
@@ -124,7 +128,7 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&generatePassphrase, "generate-passphrase", false, "Generate an encryption passphrase")
 	cmd.PersistentFlags().StringVar(&passphraseCharset, "passphrase-charset", helpers.PassphraseDefaultCharset, "The charset for the (generated) passphrase")
 	cmd.PersistentFlags().IntVar(&passphraseLength, "passphrase-length", helpers.PassphraseDefaultLength, "The length for the (generated) passphrase")
-	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", []string{"kube-system", "longhorn-system"}, "Namespaces to enable for reflection")
+	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", nil, "Namespaces to mirror the Secret into with --reflect")
 	cmd.PersistentFlags().IntVar(&encryptionReplicas, "encryption-replicas", 3, "The amount of replicas to create of encrypted drives")
 	cmd.PersistentFlags().IntVar(&staleReplicaTimeout, "stale-replica-timeout", 2880, "The timeout before stale replicas are removed")
 	cmd.PersistentFlags().StringVar(&fromBackup, "from-backup", "", "An optional backup to create replicas from")

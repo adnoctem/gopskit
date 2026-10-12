@@ -27,6 +27,10 @@ func NewNginxCommand(app *app.State) *cobra.Command {
 			opts := make([]helpers.DiffieHellmanOpt, 0)
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
+			annotations, err := reflectorAnnotations(reflect, reflectNamespaces)
+			if err != nil {
+				return err
+			}
 
 			secret := &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
@@ -36,7 +40,7 @@ func NewNginxCommand(app *app.State) *cobra.Command {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "dhparam",
 					Namespace:   namespace,
-					Annotations: reflectorAnnotations(reflect, reflectNamespaces),
+					Annotations: annotations,
 				},
 				Type: "Opaque",
 			}
@@ -73,10 +77,7 @@ func NewNginxCommand(app *app.State) *cobra.Command {
 
 	cmd.PersistentFlags().IntVarP(&bits, "bits", "b", helpers.DHParamDefaultBits, "The amount for bits to generate")
 	cmd.PersistentFlags().BoolVar(&overwrite, "overwrite", false, "Replace an existing Secret with newly generated parameters")
-	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", []string{
-		"kube-system",
-		"ingress-nginx"},
-		"Namespaces to enable for reflection")
+	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", nil, "Namespaces to mirror the Secret into with --reflect")
 
 	return cmd
 }

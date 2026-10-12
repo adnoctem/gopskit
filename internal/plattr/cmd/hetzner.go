@@ -33,6 +33,10 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
+			annotations, err := reflectorAnnotations(reflect, reflectNamespaces)
+			if err != nil {
+				return err
+			}
 
 			if generatePassphrase && passphrase != "" {
 				return errors.New("--generate-passphrase and a given passphrase exclude each other")
@@ -64,7 +68,7 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "hetzner-volume-encryption",
 					Namespace:   namespace,
-					Annotations: reflectorAnnotations(reflect, reflectNamespaces),
+					Annotations: annotations,
 				},
 				Type: "Opaque",
 				StringData: map[string]string{
@@ -105,7 +109,7 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&generatePassphrase, "generate-passphrase", false, "Generate an encryption passphrase")
 	cmd.PersistentFlags().StringVar(&passphraseCharset, "passphrase-charset", helpers.PassphraseDefaultCharset, "The charset for the (generated) passphrase")
 	cmd.PersistentFlags().IntVar(&passphraseLength, "passphrase-length", helpers.PassphraseDefaultLength, "The length for the (generated) passphrase")
-	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", []string{"kube-system"}, "Namespaces to enable for reflection")
+	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", nil, "Namespaces to mirror the Secret into with --reflect")
 
 	return cmd
 }

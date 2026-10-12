@@ -28,6 +28,10 @@ func NewCloudflareCommand(app *app.State) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
+			annotations, err := reflectorAnnotations(reflect, reflectNamespaces)
+			if err != nil {
+				return err
+			}
 
 			if token == "" {
 				return errors.New("cannot create Cloudflare Secret without credentials")
@@ -41,7 +45,7 @@ func NewCloudflareCommand(app *app.State) *cobra.Command {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "cloudflare-api-credentials",
 					Namespace:   namespace,
-					Annotations: reflectorAnnotations(reflect, reflectNamespaces),
+					Annotations: annotations,
 				},
 				Type: "Opaque",
 				Data: map[string][]byte{
@@ -56,11 +60,7 @@ func NewCloudflareCommand(app *app.State) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&token, "token", "", "Cloudflare API token")
 	cmd.PersistentFlags().BoolVar(&overwrite, "overwrite", false, "Replace an existing Secret, e.g. to rotate the token")
 	config.BindEnv(cmd.PersistentFlags(), "token", "CLOUDFLARE_API_TOKEN")
-	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", []string{
-		"kube-system",
-		"cert-manager",
-		"external-dns"},
-		"Namespaces to enable for reflection")
+	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", nil, "Namespaces to mirror the Secret into with --reflect")
 
 	return cmd
 }

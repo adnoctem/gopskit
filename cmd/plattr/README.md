@@ -47,15 +47,15 @@ export AWS_SECRET_ACCESS_KEY=...
 export CLOUDFLARE_API_TOKEN=...
 
 # Provider credentials in kube-system, mirrored by Reflector into the namespaces that use them.
-plattr aws --reflect
-plattr cloudflare --reflect
+plattr aws --reflect --reflect-namespaces external-dns --reflect-namespaces velero
+plattr cloudflare --reflect --reflect-namespaces cert-manager --reflect-namespaces external-dns
 
 # Encrypted volumes. The passphrase is generated and only ever stored in the Secret.
 plattr hetzner-encryption --generate-passphrase
 plattr longhorn-encryption --generate-passphrase
 
 # Diffie-Hellman parameters for ingress-nginx. 4096 bits can take many minutes.
-plattr ingress-nginx --reflect
+plattr ingress-nginx --reflect --reflect-namespaces ingress-nginx
 
 # What was created.
 kubectl -n kube-system get secret aws-credentials cloudflare-api-credentials \
@@ -109,16 +109,16 @@ Creates the Secret `aws-credentials`:
 
 Both values are required; without either, the command fails before touching the cluster.
 
-| Flag                   | Default                                                                 |
-| ---------------------- | ----------------------------------------------------------------------- |
-| `--access-key-id`      | `$AWS_ACCESS_KEY_ID`                                                    |
-| `--secret-access-key`  | `$AWS_SECRET_ACCESS_KEY`                                                |
-| `--overwrite`          | off; replaces an existing Secret, to rotate the credentials             |
-| `--reflect-namespaces` | `kube-system`, `vault`, `keycloak`, `gitlab`, `harbor`, `awx`, `matomo` |
+| Flag                   | Default                                                     |
+| ---------------------- | ----------------------------------------------------------- |
+| `--access-key-id`      | `$AWS_ACCESS_KEY_ID`                                        |
+| `--secret-access-key`  | `$AWS_SECRET_ACCESS_KEY`                                    |
+| `--overwrite`          | off; replaces an existing Secret, to rotate the credentials |
+| `--reflect-namespaces` | none; required with `--reflect`                             |
 
 ```sh
 # Rotate the key pair.
-AWS_ACCESS_KEY_ID=AKIA... AWS_SECRET_ACCESS_KEY=... plattr aws --reflect --overwrite
+AWS_ACCESS_KEY_ID=AKIA... AWS_SECRET_ACCESS_KEY=... plattr aws --reflect --reflect-namespaces external-dns --overwrite
 ```
 
 ### `cloudflare`
@@ -130,7 +130,7 @@ or `$CLOUDFLARE_API_TOKEN`. The token is required.
 | ---------------------- | ----------------------------------------------------- |
 | `--token`              | `$CLOUDFLARE_API_TOKEN`                               |
 | `--overwrite`          | off; replaces an existing Secret, to rotate the token |
-| `--reflect-namespaces` | `kube-system`, `cert-manager`, `external-dns`         |
+| `--reflect-namespaces` | none; required with `--reflect`                       |
 
 ```sh
 plattr cloudflare --reflect --reflect-namespaces cert-manager --reflect-namespaces external-dns
@@ -155,7 +155,7 @@ is an error. Once the Secret exists, a re-run needs none.
 | `--generate-passphrase` | off                             |
 | `--passphrase-length`   | `48`                            |
 | `--passphrase-charset`  | `A`-`Z`, `a`-`z`, `0`-`9`       |
-| `--reflect-namespaces`  | `kube-system`                   |
+| `--reflect-namespaces`  | none; required with `--reflect` |
 
 There is no `--overwrite`; see [Existing objects](#existing-objects) for why.
 
@@ -194,7 +194,7 @@ The passphrase works as for `hetzner-encryption`.
 | `--encryption-replicas`   | `3`; becomes `numberOfReplicas`                                |
 | `--stale-replica-timeout` | `2880`; becomes `staleReplicaTimeout` (Longhorn reads minutes) |
 | `--from-backup`           | empty; becomes `fromBackup`                                    |
-| `--reflect-namespaces`    | `kube-system`, `longhorn-system`                               |
+| `--reflect-namespaces`    | none; required with `--reflect`                                |
 
 There is no `--overwrite`.
 
@@ -218,14 +218,14 @@ creating the Secret, and `plattr` exits with an error.
 | ---------------------- | ---------------------------------------------------------------- |
 | `-b`, `--bits`         | `4096`                                                           |
 | `--overwrite`          | off; replaces an existing Secret with newly generated parameters |
-| `--reflect-namespaces` | `kube-system`, `ingress-nginx`                                   |
+| `--reflect-namespaces` | none; required with `--reflect`                                  |
 
 ```sh
 # Faster, for a test cluster.
 plattr ingress-nginx --bits 2048
 
 # Fresh parameters for an existing Secret.
-plattr ingress-nginx --reflect --overwrite
+plattr ingress-nginx --reflect --reflect-namespaces ingress-nginx --overwrite
 ```
 
 To generate the parameters ahead of time, outside the cluster, use
@@ -307,9 +307,10 @@ reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
 reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: <namespaces>
 ```
 
-Without `--reflect` there are no annotations at all, and `--reflect-namespaces` has no effect. Each
-command has its own default list, shown in its section above. Give the flag once per namespace on
-the command line; in the configuration file, give a list. Reflector is not installed by `plattr`; it
+Without `--reflect` there are no annotations at all, and `--reflect-namespaces` has no effect. With
+it, `--reflect-namespaces` is required: there is no default list, since which namespaces need a
+credential depends on the cluster, and Reflector would read an empty list as every namespace. Give
+the flag once per namespace on the command line; in the configuration file, give a list. Reflector is not installed by `plattr`; it
 has to be running in the cluster for the annotations to do anything.
 
 ## Credentials from the environment
@@ -339,10 +340,10 @@ file, which wins over the default. Unknown keys are an error. The details are in
 ```yaml
 # plattr.yaml
 namespace: kube-system
-reflect: true
+reflect: true # every command below then needs its reflect-namespaces
 
 aws:
-  reflect-namespaces: [kube-system, vault, gitlab]
+  reflect-namespaces: [external-dns, velero]
 
 cloudflare:
   reflect-namespaces: [cert-manager, external-dns]
@@ -350,9 +351,11 @@ cloudflare:
 longhorn-encryption:
   generate-passphrase: true
   encryption-replicas: 2
+  reflect-namespaces: [longhorn-system]
 
 ingress-nginx:
   bits: 4096
+  reflect-namespaces: [ingress-nginx]
 
 generate:
   passphrase:
