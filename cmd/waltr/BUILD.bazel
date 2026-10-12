@@ -26,3 +26,6 @@ go_binary(
     embed = [":waltr_lib"],
     visibility = ["//visibility:public"],
 )
+
+# the example configuration, which the command tests apply to a Vault in a container
+exports_files(["waltr.example.yaml"])

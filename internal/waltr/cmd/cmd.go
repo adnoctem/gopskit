@@ -5,6 +5,7 @@ import (
 
 	"github.com/adnoctem/gopskit/internal/bridgecmd"
 	"github.com/adnoctem/gopskit/internal/waltr/app"
+	"github.com/adnoctem/gopskit/internal/waltr/state"
 	"github.com/adnoctem/gopskit/pkg/config"
 	"github.com/spf13/cobra"
 )
@@ -13,16 +14,14 @@ var (
 	// Commands is a slice of CLIOpt options for subcommands of the 'waltr' CLI
 	Commands = []app.CLIOpt{
 		NewInitCommand,
-		NewMountsCommand,
-		NewConfigureCommand,
-		NewPrepareCommand,
-		NewTransitCommand,
-	}
-
-	// PrepareSubcommands is a slice of CLIOpt options for subcommands of the 'prepare' subcommand
-	PrepareSubcommands = []app.CLIOpt{
-		NewPrepareKeycloakCommand,
-		NewPrepareGitLabCommand,
+		NewApplyCommand,
+		NewValidateCommand,
+		NewMountCommand,
+		NewAuthCommand,
+		NewPasswordPolicyCommand,
+		NewPolicyCommand,
+		NewRoleCommand,
+		NewSecretCommand,
 	}
 )
 
@@ -68,6 +67,8 @@ func NewRootCommand(waltr *app.State) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&waltr.CredentialFile, "credential-file", "",
 		"Where 'waltr init' stores the root token and keys, and other commands read them (default: per --environment in the cache directory)")
 	config.AddFlag(cmd, app.Name)
+	// the Vault configuration waltr apply declares, see internal/waltr/state
+	config.AddDocument(cmd, state.Section)
 	waltr.AddKubeFlags(cmd)
 
 	// add subcommands

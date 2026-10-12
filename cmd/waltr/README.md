@@ -3,10 +3,15 @@
 Bootstrap and configure HashiCorp Vault on Kubernetes.
 
 `waltr` takes a freshly installed Vault - typically from the official Helm chart - to a usable
-state: it initializes it, unseals every Pod, mounts the authentication methods and secrets engines
-the rest of the platform expects, and writes the policies, Kubernetes auth roles and generated
-credentials that applications such as Keycloak and GitLab read at startup. Every step can be run
-again; what already exists is left alone unless you ask otherwise.
+state: it initializes it and unseals every Pod, then brings Vault's configuration in line with what
+you declare in `waltr.yaml`: secrets engines, auth methods, password and ACL policies, Kubernetes
+auth roles and the KV secrets applications read at startup, with generated passwords. Everything can
+be run again; what already matches is left alone, and nothing you haven't declared is deleted.
+
+The same configuration can be changed one object at a time from the command line - `waltr policy
+write`, `waltr role write` and so on - for an administrator at a shell, or declared in full and
+applied at once with `waltr apply`, for a file kept in Git or rendered by a tool such as Ansible.
+Both go through the same engine and have the same effect.
 
 It talks to Vault's HTTP API. It does not need the `vault` CLI, but it reads the same environment
 variables, so a shell set up for one works for the other.
@@ -19,15 +24,14 @@ variables, so a shell set up for one works for the other.
 - [The root token and keys](#the-root-token-and-keys)
 - [Commands](#commands)
   - [`init`](#init)
-  - [`mounts`](#mounts)
-  - [`configure`](#configure)
-  - [`transit`](#transit)
-  - [`prepare keycloak`](#prepare-keycloak)
-  - [`prepare gitlab`](#prepare-gitlab)
+  - [`validate`](#validate)
+  - [`apply`](#apply)
+  - [Changing one object](#changing-one-object)
   - [`proxy`](#proxy)
 - [Configuration](#configuration)
+- [The Vault state](#the-vault-state)
 - [A full bootstrap](#a-full-bootstrap)
-- [Fixed names](#fixed-names)
+- [Built-in assumptions](#built-in-assumptions)
 
 ## Install
 
@@ -56,10 +60,16 @@ export VAULT_CACERT=/etc/ssl/private-ca.pem
 #    for the environment, `dev` unless -e says otherwise.
 waltr init --namespace vault
 
-# 4. Mount auth methods and secrets engines, then write policies.
-waltr mounts
-waltr configure
+# 4. Start from the example configuration, adapt it, and apply it.
+cp waltr.example.yaml waltr.yaml
+waltr validate
+waltr apply --dry-run
+waltr apply
 ```
+
+[`waltr.example.yaml`](waltr.example.yaml) is a production-ready starting point: a KV-v2 and a
+transit engine, Kubernetes authentication, password policies, an administrator policy, and the
+policy, role and secrets of one example application.
 
 Nothing after step 3 needs a token on the command line: the other commands use the root token
 `init` stored. See [The root token and keys](#the-root-token-and-keys) before using this on
@@ -108,8 +118,8 @@ Kubernetes access; reaching Vault directly does not.
 `$KUBECONFIG`, then `~/.kube/config`, and its current context.
 
 Only `init` (which finds and execs into the Vault Pods), the `proxy` commands and anything going
-through the bridge touch the cluster. `mounts`, `configure`, `transit` and `prepare` against a
-directly reachable Vault run without a kubeconfig.
+through the bridge touch the cluster. `apply` and the other configuration commands against a
+directly reachable Vault run without a kubeconfig, and `validate` contacts nothing at all.
 
 ## The root token and keys
 
@@ -158,8 +168,8 @@ carries on - the token is still in the credentials file.
 
 ## Commands
 
-All of them can be run again safely. Each one checks what exists before writing, logs what it
-created and what it skipped, and creates only what is missing unless `--overwrite` says otherwise.
+All of them can be run again safely. Each one compares what Vault has with what is asked for, and
+changes only what differs.
 
 ### `init`
 
@@ -212,127 +222,115 @@ keys it never saw.
 `--threshold` must match the value Vault was initialized with: an unseal attempt that runs out of
 keys while the Pod is still sealed fails with a hint to check it.
 
-### `mounts`
+### `validate`
 
 ```sh
-waltr mounts
+waltr validate
+waltr validate --config cmd/waltr/waltr.example.yaml
 ```
 
-Alias `mount`. Enables, if not yet enabled:
+Checks the `vault:` section of the configuration file without contacting Vault: that it decodes -
+unknown and misspelled keys are errors, reported with their line - that every value is well-formed,
+and that everything it refers to is declared in it: the policies roles attach, the auth method
+roles belong to, the password policies generated values use, and the KV-v2 mounts secrets live in.
+It needs no address, token or cluster, so it suits CI and pre-commit hooks.
 
-| Path          | Type                     | Notes                                          |
-| ------------- | ------------------------ | ---------------------------------------------- |
-| `kubernetes/` | auth method `kubernetes` | configured right after enabling, see below     |
-| `oidc/`       | auth method `oidc`       | enabled only; `waltr` doesn't configure it     |
-| `kv/`         | secrets engine `kv-v2`   | where `configure` and `prepare` expect secrets |
-
-The Kubernetes auth method is configured with `--kubernetes-host`, the API server address as
-_Vault_ reaches it (default `https://kubernetes.default.svc`). For a Vault inside the cluster that
-is all it needs: it uses the CA from its own Pod. For a Vault outside the cluster, give the API
-server's CA with `--kubernetes-ca-cert <pem file>` and an address it can reach.
-
-The configuration is written when `waltr` enables the method. On later runs it is left as it is,
-unless `--overwrite` is given, which rewrites it from the flags - for example after the API
-server's address or CA changed.
-
-### `configure`
+### `apply`
 
 ```sh
-waltr configure
+waltr apply --dry-run
+waltr apply
 ```
 
-Aliases `conf` and `config`. Writes ACL policies and password policies.
+Brings Vault in line with the `vault:` section of the configuration file. The section is validated
+first, as `validate` does; then `apply` reads what Vault has, plans the changes, and makes them in
+this order, so that everything exists before something refers to it:
 
-One read-only ACL policy per application, named after it, each granting `read` on
-`kv/data/<name>/*`:
+1. secrets engines (`mounts`), and the keys of transit engines
+2. auth methods (`auth`), and the configuration of kubernetes ones
+3. password policies (`passwordPolicies`)
+4. ACL policies (`policies`)
+5. Kubernetes auth roles (`roles`)
+6. KV-v2 secrets (`secrets`)
+
+Each change is logged as it is made. `--dry-run` prints the planned changes to standard output, one
+per line, and changes nothing:
 
 ```text
-keycloak  awx  crowdsec  gitlab  gitlab-runner  harbor  headlamp  homepage  jenkins
-kubescape  loki  matomo
+create mount kv (kv-v2)
+create transit key transit/vault-secrets-operator
+update policy grafana
+update role kubernetes/grafana (token_period)
+update secret kv/grafana/admin (+password ~username)
 ```
 
-The list is fixed; see [Fixed names](#fixed-names).
+In a secret's details, `+key` is a key that will be added and `~key` one whose value will change.
+When Vault already matches, nothing is printed.
 
-An ACL policy `admin`, which grants management of ACL policies (`sys/policies/acl/*`), auth methods
-(`auth/*`, `sys/auth/*`), secrets engines (`sys/mounts/*`), identities (`identity/*`), the
-`kv/*`, `transit/*` and `cubbyhole/*` paths, and `read` on `sys/health`.
+What `apply` does and does not do:
 
-Four password policies, used by `prepare` to generate secrets:
+- **It never deletes.** A policy, role, secret or key removed from the file stays in Vault; delete
+  it with the `vault` CLI.
+- **It never remounts.** A secrets engine or auth method of another type at a declared path is an
+  error, since replacing it would destroy its data or drop its roles. Descriptions are set when an
+  engine or method is created and not changed afterwards.
+- **Policies and roles are made to match.** An ACL or password policy whose text differs is
+  rewritten; a role whose ServiceAccounts, namespaces, policies, audience, TTL or period differ is
+  rewritten. A kubernetes auth method's host and CA are rewritten when they differ.
+- **Literal secret values are made to match**, and keys a secret has but the file doesn't declare
+  are kept - an application can store its own keys next to the declared ones.
+- **Generated values are generated once.** A `{generate: <password policy>}` value is filled from
+  the password policy when the key doesn't exist yet, and kept on every later run. `--rotate`
+  replaces generated values that exist - which means the applications using the old ones have to
+  be updated to match.
+- **Transit keys are created, never replaced.** Rotating a key's material is Vault's own operation
+  (`vault write -f transit/keys/<key>/rotate`).
 
-| Name                            | Length | Composition (at least)                                  |
-| ------------------------------- | ------ | ------------------------------------------------------- |
-| `alphanumeric-password`         | 64     | 16 lowercase, 16 uppercase, 16 digits                   |
-| `alphanumeric-special-password` | 64     | 12 lowercase, 12 uppercase, 12 digits, 12 of `!@#$%^&*` |
-| `s3-access-key`                 | 32     | 16 uppercase, 12 digits; uppercase and digits only      |
-| `s3-secret-key`                 | 64     | 32 uppercase, 24 digits; uppercase and digits only      |
+| Flag        | Meaning                                            |
+| ----------- | -------------------------------------------------- |
+| `--dry-run` | print what would change, change nothing            |
+| `--rotate`  | replace generated secret values that already exist |
 
-Existing policies are skipped. `--overwrite` rewrites the per-application policies; it does not
-touch `admin` or the password policies.
+### Changing one object
 
-### `transit`
+Each part of the `vault:` section has a command group. `apply` within a group applies only that
+part of the file - the whole section is still validated:
 
 ```sh
-waltr transit
+waltr policy apply          # only the policies: section
+waltr secret apply --rotate # only the secrets:, rotating generated values
 ```
 
-Aliases `encryption` and `transit-encryption`. Prepares Vault for the Vault Secrets Operator's
-encrypted client cache:
+The other commands in a group change a single object directly, without a configuration file. They
+build the same object the file would declare and apply it through the same engine, so the result
+is the same, and they take `--dry-run` too. Unlike in a file, the object may refer to anything Vault
+already has, such as a policy written earlier.
 
-- the `transit` secrets engine at `transit/`
-- the encryption key `transit/keys/vso-client-cache`
-- an ACL policy `vso-auth`, granting `create` and `update` on `transit/encrypt/vso-client-cache` and
-  `transit/decrypt/vso-client-cache` - what the operator does with the key
-- a Kubernetes auth role `vso-auth`, bound to the ServiceAccount `vault-secrets-operator` in the
-  namespace `vault-secrets-operator`, with audience `vault`, token period 120 seconds, no TTL, and
-  the policies `vso-auth` plus every per-application policy `configure` writes
+| Command                                                                                      | Changes                                              |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `waltr mount enable PATH --type TYPE [--description D] [--key K]...`                         | a secrets engine, and a transit engine's keys        |
+| `waltr auth enable PATH --type TYPE [--kubernetes-host URL] [--kubernetes-ca-cert FILE]`     | an auth method, and a kubernetes one's configuration |
+| `waltr password-policy write NAME -f FILE`                                                   | a password policy, from an HCL file                  |
+| `waltr policy write NAME -f FILE`                                                            | an ACL policy, from an HCL file                      |
+| `waltr role write NAME --service-account SA --service-account-namespace NS --policy P [...]` | a Kubernetes auth role                               |
+| `waltr secret write MOUNT/PATH [--set KEY=VALUE]... [--generate KEY=POLICY]... [--rotate]`   | keys of a KV-v2 secret                               |
 
-Run `mounts` and `configure` first: the role belongs to the `kubernetes/` auth method and refers to
-their policies. `--overwrite` rewrites the policy and the role; the `transit/` engine itself is
-never mounted again, which would fail while it is mounted and destroy its keys if it didn't.
-
-### `prepare keycloak`
+`role write` also takes `--auth` (the auth method's path, default `kubernetes`), `--audience`,
+`--token-ttl` and `--token-period` (durations such as `1h`). `--service-account`,
+`--service-account-namespace` and `--policy` are repeatable. For example:
 
 ```sh
-waltr prepare keycloak
+waltr mount enable kv --type kv-v2
+waltr auth enable kubernetes --type kubernetes --kubernetes-host https://kubernetes.default.svc
+waltr password-policy write alphanumeric -f alphanumeric.hcl
+waltr policy write grafana -f grafana.hcl
+waltr role write grafana --service-account grafana --service-account-namespace monitoring \
+  --policy grafana --audience vault --token-period 24h
+waltr secret write kv/grafana/admin --set username=admin --generate password=alphanumeric
 ```
 
-Needs `mounts` and `configure` to have run: it writes to `kv/`, uses the `kubernetes/` auth method,
-refers to the `keycloak` policy and generates passwords with `alphanumeric-password`. It creates:
-
-- a Kubernetes auth role `keycloak`, bound to the ServiceAccount `keycloak` in the namespace
-  `keycloak`, audience `vault`, token period 24h, no TTL, policy `keycloak`
-- `kv/keycloak/config` with `username: mg` and a generated `password` - the admin account
-- `kv/keycloak/credentials/postgresql` with `username: keycloak` and a generated `password`
-
-The role's policy lets Keycloak read everything under `kv/keycloak/`. With the `vault` CLI:
-
-```sh
-vault kv get kv/keycloak/config
-```
-
-Existing roles and secrets are skipped. `--overwrite` rewrites them, which **replaces the stored
-passwords with new ones** - the applications using the old ones have to be updated to match.
-
-### `prepare gitlab`
-
-```sh
-waltr prepare gitlab
-```
-
-Same prerequisites as `prepare keycloak`, plus the `s3-access-key` and `s3-secret-key` password
-policies. It creates:
-
-- a Kubernetes auth role `gitlab`, bound to the ServiceAccount `gitlab` in the namespace `gitlab`,
-  audience `vault`, token period 24h, no TTL, policy `gitlab`
-- `kv/gitlab/config` with `username: mg` and a generated `password`
-- `kv/gitlab/credentials/redis` with `username: redis` and a generated `password`
-- `kv/gitlab/credentials/postgresql` with `username: gitlab` and a generated `password`
-- `kv/gitlab/credentials/minio` with a generated `access_key` and `secret_key`
-
-`--overwrite` behaves as for Keycloak, including the password rotation.
-
-The roles in both `prepare` commands, and the one `transit` creates, set the audience `vault`: the
-ServiceAccount token an application presents must be issued for that audience.
+has the same effect as declaring those objects in the `vault:` section - as in the example under
+[The Vault state](#the-vault-state) - and running `waltr apply`.
 
 ### `proxy`
 
@@ -374,6 +372,8 @@ on the command line wins over the environment variable, which wins over the file
 the default. Unknown keys are an error. The details are in
 [configuring the CLIs](../../docs/configuration.md).
 
+The same file holds the Vault state under `vault:`, described [below](#the-vault-state):
+
 ```yaml
 # waltr.yaml
 vault-addr: https://vault.vault.svc:8200
@@ -388,17 +388,84 @@ initialize:
   threshold: 3
   shares: 5
 
-mounts:
-  kubernetes-host: https://kubernetes.default.svc
+vault:
+  mounts:
+    kv: { type: kv-v2 }
+  # ...
 ```
 
 The token is better kept in `$VAULT_TOKEN`, or left to the credentials file, than written into
 `waltr.yaml`.
 
+## The Vault state
+
+The `vault:` section declares the configuration `apply` brings Vault in line with. Every part is
+optional, and each is a mapping keyed by a path or name. It is decoded strictly: a key `waltr`
+doesn't know is an error, not ignored. [`waltr.example.yaml`](waltr.example.yaml) shows all of it.
+
+```yaml
+vault:
+  # Secrets engines, keyed by path.
+  mounts:
+    kv:
+      type: kv-v2 # any engine type Vault knows
+      description: Application secrets # optional; set when the engine is created
+    transit:
+      type: transit
+      keys: [vault-secrets-operator] # encryption keys; transit engines only
+
+  # Auth methods, keyed by path.
+  auth:
+    kubernetes:
+      type: kubernetes
+      description: Workloads authenticating with their ServiceAccount tokens
+      kubernetes: # kubernetes methods only
+        host: https://kubernetes.default.svc # the API server as Vault reaches it (required)
+        caCertFile: /etc/ssl/kubernetes-ca.pem # optional; for a Vault outside the cluster
+    oidc:
+      type: oidc # enabled only; configure it with the vault CLI
+
+  # Password policies, in HCL, keyed by name.
+  passwordPolicies:
+    alphanumeric: |
+      length = 64
+      rule "charset" {
+        charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+      }
+
+  # ACL policies, in HCL, keyed by name.
+  policies:
+    grafana: |
+      path "kv/data/grafana/*" {
+        capabilities = ["read"]
+      }
+
+  # Kubernetes auth roles, keyed by name.
+  roles:
+    grafana:
+      auth: kubernetes # the auth method's path; default kubernetes
+      serviceAccounts: [grafana] # required
+      namespaces: [monitoring] # required
+      policies: [grafana] # required; "default" needs no declaration
+      audience: vault # optional
+      tokenTTL: 1h # optional, a duration
+      tokenPeriod: 24h # optional, a duration
+
+  # KV-v2 secrets, keyed by <mount>/<path>.
+  secrets:
+    kv/grafana/admin:
+      username: admin # a literal value
+      password: { generate: alphanumeric } # generated from a password policy, once
+```
+
+Everything the section refers to must be declared in it: a role's auth method and policies (other
+than `default`), a generated value's password policy, and a secret's mount, which must be of type
+`kv-v2`. `waltr validate` checks this, and `apply` refuses a section that fails it.
+
 ## A full bootstrap
 
-From a freshly installed chart to Vault ready for the Secrets Operator, Keycloak and GitLab, with
-the `waltr.yaml` above in the working directory:
+From a freshly installed chart to a configured Vault, with a `waltr.yaml` adapted from
+[`waltr.example.yaml`](waltr.example.yaml) in the working directory:
 
 ```sh
 # The bridge, allowed to reach Vault only.
@@ -408,36 +475,23 @@ waltr proxy check --target vault.vault.svc:8200
 # Initialize and unseal. Back up ~/.cache/waltr/prod/vault-credentials.json right away.
 waltr init
 
-# Auth methods, secrets engines and policies.
-waltr mounts
-waltr configure
-
-# The Vault Secrets Operator's client cache.
-waltr transit
-
-# Application secrets and roles.
-waltr prepare keycloak
-waltr prepare gitlab
+# Engines, auth methods, policies, roles and secrets, as declared.
+waltr validate
+waltr apply --dry-run
+waltr apply
 ```
 
-The `oidc/` auth method is enabled but not configured; point it at your identity provider with
-the `vault` CLI or the API.
+To add an application later, declare its policy, role and secrets in the file and run `waltr apply`
+again; only the new objects are created. After a restart of the Vault Pods, `waltr init` alone
+unseals them again.
 
-After a restart of the Vault Pods, `waltr init` alone unseals them again.
+## Built-in assumptions
 
-## Fixed names
+Everything about the Vault configuration comes from the file or the command line. What remains
+built in concerns finding and unsealing the Vault Pods, and matches the official Helm chart:
 
-Several values are built into `waltr` and are not configurable. On a cluster laid out differently,
-check them before running the commands that use them.
-
-| What                                    | Value                                                                                       | Used by                              |
-| --------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------ |
-| KV-v2 mount                             | `kv/`                                                                                       | `mounts`, `configure`, `prepare`     |
-| Per-application policies                | the twelve names under [`configure`](#configure)                                            | `configure`, `transit`               |
-| Admin username in `kv/<app>/config`     | `mg`                                                                                        | `prepare keycloak`, `prepare gitlab` |
-| Database and Redis usernames            | `keycloak`, `gitlab`, `redis`                                                               | `prepare`                            |
-| Role ServiceAccount and namespace       | `keycloak`/`keycloak`, `gitlab`/`gitlab`, `vault-secrets-operator`/`vault-secrets-operator` | `prepare`, `transit`                 |
-| Role audience                           | `vault`                                                                                     | `prepare`, `transit`                 |
-| Transit key                             | `transit/keys/vso-client-cache`                                                             | `transit`                            |
-| Shell history file disabled in the Pods | `/home/vault/.ash_history`                                                                  | `init`                               |
-| Seal detection                          | volume `config`, key `extraconfig-from-values.hcl`                                          | `init`                               |
+| What                                    | Value                                              | Used by |
+| --------------------------------------- | -------------------------------------------------- | ------- |
+| Pod label                               | `app.kubernetes.io/name=vault` (`--label`)         | `init`  |
+| Shell history file disabled in the Pods | `/home/vault/.ash_history`                         | `init`  |
+| Seal detection                          | volume `config`, key `extraconfig-from-values.hcl` | `init`  |

@@ -1,0 +1,177 @@
+# waltr.yaml - a starting point for a production Vault on Kubernetes.
+#
+# Copy it to ./waltr.yaml, ~/.config/waltr/waltr.yaml or /etc/waltr/waltr.yaml, or pass it with
+# --config, and adapt the names to your cluster. `waltr validate` checks it without contacting
+# Vault; `waltr apply --dry-run` shows what applying it would change.
+#
+# The example sets up:
+#   - a KV-v2 engine for application secrets and a transit engine for the Vault Secrets Operator
+#   - Kubernetes authentication, so workloads log in with their ServiceAccount tokens
+#   - password policies that generated secret values are drawn from
+#   - an administrator policy, and per-application read-only policies
+#   - roles binding each application's ServiceAccount to its policy
+#   - the secrets an application starts with, with generated passwords
+#
+# The application, "grafana" in the namespace "monitoring", stands for any of yours: repeat its
+# policy, role and secrets per application.
+
+# -- Connection --------------------------------------------------------------------------------
+# These are flag settings; see `waltr --help`. Secrets are better kept out of this file: give the
+# token through $VAULT_TOKEN, or let waltr use the root token `waltr init` stored.
+
+vault-addr: https://vault.vault.svc:8200
+# ca-cert: [/etc/ssl/certs/internal-ca.pem]
+
+# where `waltr init` finds the Vault Pods
+namespace: vault
+
+initialize:
+  shares: 5
+  threshold: 3
+
+# -- Desired state -----------------------------------------------------------------------------
+# What `waltr apply` brings Vault in line with. Nothing here is deleted from Vault when it is
+# removed from the file; generated values are kept once they exist unless --rotate is given.
+
+vault:
+  mounts:
+    kv:
+      type: kv-v2
+      description: Application secrets
+    transit:
+      type: transit
+      description: Encryption for the Vault Secrets Operator's client cache
+      keys: [vault-secrets-operator]
+
+  auth:
+    kubernetes:
+      type: kubernetes
+      description: Workloads authenticating with their ServiceAccount tokens
+      kubernetes:
+        # the API server as Vault reaches it; inside the cluster Vault reads the CA from its Pod
+        host: https://kubernetes.default.svc
+        # caCertFile: /etc/ssl/certs/kubernetes-ca.pem   # only for a Vault outside the cluster
+
+  passwordPolicies:
+    # 64 characters, at least 16 each of lower case, upper case and digits
+    alphanumeric: |
+      length = 64
+      rule "charset" {
+        charset   = "abcdefghijklmnopqrstuvwxyz"
+        min-chars = 16
+      }
+      rule "charset" {
+        charset   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        min-chars = 16
+      }
+      rule "charset" {
+        charset   = "0123456789"
+        min-chars = 16
+      }
+    alphanumeric-special: |
+      length = 64
+      rule "charset" {
+        charset   = "abcdefghijklmnopqrstuvwxyz"
+        min-chars = 12
+      }
+      rule "charset" {
+        charset   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        min-chars = 12
+      }
+      rule "charset" {
+        charset   = "0123456789"
+        min-chars = 12
+      }
+      rule "charset" {
+        charset   = "!@#$%^&*"
+        min-chars = 12
+      }
+    # S3-style access keys, for object storage such as MinIO
+    s3-access-key: |
+      length = 20
+      rule "charset" {
+        charset   = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        min-chars = 20
+      }
+    s3-secret-key: |
+      length = 40
+      rule "charset" {
+        charset   = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        min-chars = 40
+      }
+
+  policies:
+    # for operators: manage policies, auth methods, engines and secrets, without the root token
+    administrator: |
+      path "sys/health" {
+        capabilities = ["read", "sudo"]
+      }
+      path "sys/policies/acl" {
+        capabilities = ["list"]
+      }
+      path "sys/policies/acl/*" {
+        capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+      }
+      path "sys/policies/password/*" {
+        capabilities = ["create", "read", "update", "delete", "list"]
+      }
+      path "sys/auth" {
+        capabilities = ["read"]
+      }
+      path "sys/auth/*" {
+        capabilities = ["create", "update", "delete", "sudo"]
+      }
+      path "auth/*" {
+        capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+      }
+      path "sys/mounts" {
+        capabilities = ["read"]
+      }
+      path "sys/mounts/*" {
+        capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+      }
+      path "kv/*" {
+        capabilities = ["create", "read", "update", "delete", "list"]
+      }
+      path "identity/*" {
+        capabilities = ["create", "read", "update", "delete", "list"]
+      }
+
+    # for the Vault Secrets Operator: its encrypted client cache
+    vault-secrets-operator: |
+      path "transit/encrypt/vault-secrets-operator" {
+        capabilities = ["create", "update"]
+      }
+      path "transit/decrypt/vault-secrets-operator" {
+        capabilities = ["create", "update"]
+      }
+
+    # per application: read its own secrets, nothing else
+    grafana: |
+      path "kv/data/grafana/*" {
+        capabilities = ["read"]
+      }
+
+  roles:
+    # the operator reads every application's secrets on their behalf, so it holds their policies
+    vault-secrets-operator:
+      serviceAccounts: [vault-secrets-operator-controller-manager]
+      namespaces: [vault-secrets-operator-system]
+      policies: [vault-secrets-operator, grafana]
+      audience: vault
+      tokenPeriod: 2m
+
+    grafana:
+      serviceAccounts: [grafana]
+      namespaces: [monitoring]
+      policies: [grafana]
+      audience: vault
+      tokenPeriod: 24h
+
+  secrets:
+    kv/grafana/admin:
+      username: admin
+      password: { generate: alphanumeric }
+    kv/grafana/database:
+      username: grafana
+      password: { generate: alphanumeric }

@@ -50,14 +50,21 @@ initialize:
   threshold: 3
   shares: 5
 
-mounts:
-  kubernetes-host: https://kubernetes.default.svc
+# the Vault configuration `waltr apply` brings Vault in line with
+vault:
+  mounts:
+    kv: { type: kv-v2 }
+  auth:
+    kubernetes:
+      type: kubernetes
+      kubernetes: { host: https://kubernetes.default.svc }
+  # passwordPolicies, policies, roles, secrets: see cmd/waltr/waltr.example.yaml
 ```
 
 ```shell
 waltr init          # initialises Vault and unseals every Pod at its own DNS name
-waltr mounts
-waltr configure
+waltr validate      # checks the vault: section without contacting Vault
+waltr apply         # brings Vault in line with it
 ```
 
 `waltr init` stores the root token for `--environment` (or at `--credential-file`); the other

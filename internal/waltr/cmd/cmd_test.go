@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -156,80 +157,204 @@ func TestInitializeWithAutoUnseal(t *testing.T) {
 	assert.NotEmpty(t, creds.Token)
 }
 
-// TestCommandsAgainstVault runs the configuration commands in the order a bootstrap does, with
-// every connection setting coming from waltr.yaml.
-func TestCommandsAgainstVault(t *testing.T) {
+// exampleFile is the example configuration shipped with waltr. The tests apply it to a real Vault,
+// so it can't drift from what waltr accepts. It is resolved when the package loads, since the tests
+// change into temporary directories.
+var exampleFile = func() string {
+	path, err := filepath.Abs("../../../cmd/waltr/waltr.example.yaml")
+	if err != nil {
+		panic(err)
+	}
+	return path
+}()
+
+// exampleFor is the example configuration pointed at the Vault at addr. Since that Vault runs
+// outside any cluster, its Kubernetes auth method is given a CA, as the example's comments say.
+func exampleFor(t *testing.T, addr string) string {
+	t.Helper()
+
+	raw, err := os.ReadFile(exampleFile)
+	require.NoError(t, err)
+
+	content := strings.Replace(string(raw), "vault-addr: https://vault.vault.svc:8200",
+		"vault-addr: "+addr+"\ntoken: "+vaulttest.RootToken+"\nvia: direct", 1)
+	content = strings.Replace(content, "host: https://kubernetes.default.svc\n",
+		"host: https://kubernetes.default.svc\n        caCertFile: "+writeCA(t)+"\n", 1)
+
+	path := filepath.Join(t.TempDir(), "waltr.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+	return path
+}
+
+// runOut is run, returning what the command printed to stdout.
+func runOut(t *testing.T, s *app.State, args ...string) (string, error) {
+	t.Helper()
+
+	var out bytes.Buffer
+	root := NewRootCommand(s)
+	root.SetArgs(args)
+	root.SetOut(&out)
+
+	err := root.ExecuteContext(t.Context())
+	return out.String(), err
+}
+
+func TestExampleValidates(t *testing.T) {
+	s := newState(t)
+	assert.NoError(t, run(t, s, "validate", "--config", exampleFile))
+}
+
+// TestApplyExample applies the shipped example to a real Vault and checks that applying is
+// idempotent, converges drift, and keeps generated values unless asked to rotate them.
+func TestApplyExample(t *testing.T) {
 	asrt := assert.New(t)
 	addr := vaulttest.StartDev(t)
 	ctx := t.Context()
 	s := newState(t)
-
-	path := filepath.Join(t.TempDir(), "waltr.yaml")
-	require.NoError(t, os.WriteFile(path, []byte(fmt.Sprintf(`
-vault-addr: %s
-token: %s
-via: direct
-mounts:
-  kubernetes-host: https://kubernetes.default.svc:443
-  kubernetes-ca-cert: %s
-`, addr, vaulttest.RootToken, writeCA(t))), 0o600))
-
-	for _, args := range [][]string{
-		{"mounts"},
-		{"configure"},
-		{"transit"},
-		{"prepare", "keycloak"},
-		{"prepare", "gitlab"},
-	} {
-		require.NoError(t, run(t, s, append(args, "--config", path)...), "waltr %v", args)
-	}
-
+	cfg := exampleFor(t, addr)
 	vc := rootClient(t, addr, vaulttest.RootToken)
 
-	methods, err := vc.AuthListEnabledMethods(ctx)
+	// a dry run changes nothing
+	planned, err := runOut(t, s, "apply", "--dry-run", "--config", cfg)
 	require.NoError(t, err)
-	asrt.Contains(methods, "kubernetes/")
-	asrt.Contains(methods, "oidc/")
+	asrt.Contains(planned, "create mount kv (kv-v2)")
+	asrt.Contains(planned, "create secret kv/grafana/admin")
+	_, err = vc.KvV2Read(ctx, "kv", "grafana/admin")
+	asrt.Error(err, "a dry run must not write anything")
+
+	require.NoError(t, run(t, s, "apply", "--config", cfg))
 
 	engines, err := vc.MountsListSecretsEngines(ctx)
 	require.NoError(t, err)
 	asrt.Contains(engines, "kv/")
+	asrt.Contains(engines, "transit/")
 
-	policies, err := vc.PoliciesListAclPolicies(ctx)
+	key, err := vc.Read(ctx, "transit/keys/vault-secrets-operator")
 	require.NoError(t, err)
-	asrt.Contains(policies, "keycloak")
+	asrt.NotEmpty(key)
 
-	k8s, err := vc.Read(ctx, "auth/kubernetes/config")
+	role, err := vc.Read(ctx, "auth/kubernetes/role/grafana")
 	require.NoError(t, err)
-	asrt.Equal("https://kubernetes.default.svc:443", k8s["kubernetes_host"], "the scoped setting must reach mounts")
+	asrt.Equal([]any{"grafana"}, role["bound_service_account_names"])
+	asrt.Equal([]any{"monitoring"}, role["bound_service_account_namespaces"])
+	asrt.Equal("86400", fmt.Sprint(role["token_period"]))
 
-	// a policy changed by hand must survive a re-run without --overwrite, which needs the
-	// existing policies to be seen
-	require.NoError(t, vc.PoliciesWriteAclPolicy(ctx, "keycloak", `path "kv/data/manual" { capabilities = ["read"] }`))
-	require.NoError(t, run(t, s, "configure", "--config", path))
-	acl, err := vc.Read(ctx, "sys/policies/acl/keycloak")
+	admin, err := vc.KvV2Read(ctx, "kv", "grafana/admin")
 	require.NoError(t, err)
-	asrt.Contains(acl["policy"], "kv/data/manual")
+	asrt.Equal("admin", admin["username"])
+	password, _ := admin["password"].(string)
+	asrt.Len(password, 64, "generated from the alphanumeric password policy")
 
-	// the transit policy must grant what the operator's client cache does with the key
-	vso, err := vc.Read(ctx, "sys/policies/acl/vso-auth")
-	require.NoError(t, err)
-	asrt.Contains(vso["policy"], "transit/encrypt/vso-client-cache")
+	t.Run("applying again changes nothing", func(t *testing.T) {
+		planned, err := runOut(t, s, "apply", "--dry-run", "--config", cfg)
+		require.NoError(t, err)
+		assert.Empty(t, planned, "every object must already be as declared")
 
-	// re-running with --overwrite must work, not trip over the mounted engine
-	require.NoError(t, run(t, s, "transit", "--overwrite", "--config", path))
+		require.NoError(t, run(t, s, "apply", "--config", cfg))
+		again, err := vc.KvV2Read(ctx, "kv", "grafana/admin")
+		require.NoError(t, err)
+		assert.Equal(t, password, again["password"], "a generated value is kept")
+	})
 
-	// and mounts --overwrite rewrites the Kubernetes auth configuration
-	require.NoError(t, run(t, s, "mounts", "--overwrite", "--kubernetes-host", "https://api.example.org:6443", "--config", path))
-	k8s, err = vc.Read(ctx, "auth/kubernetes/config")
-	require.NoError(t, err)
-	asrt.Equal("https://api.example.org:6443", k8s["kubernetes_host"])
+	t.Run("drift is brought back", func(t *testing.T) {
+		require.NoError(t, vc.PoliciesWriteAclPolicy(ctx, "grafana", `path "kv/*" { capabilities = ["read"] }`))
+		require.NoError(t, vc.KvV2Write(ctx, "kv", "grafana/admin", map[string]any{
+			"username": "root", "password": password, "added-by-hand": "kept",
+		}))
 
-	for _, secret := range []string{"keycloak/config", "keycloak/credentials/postgresql"} {
-		data, err := vc.KvV2Read(ctx, "kv", secret)
-		require.NoError(t, err, secret)
-		asrt.NotEmpty(data["password"], secret)
+		planned, err := runOut(t, s, "apply", "--dry-run", "--config", cfg)
+		require.NoError(t, err)
+		assert.Contains(t, planned, "update policy grafana")
+		assert.Contains(t, planned, "update secret kv/grafana/admin (~username)")
+
+		require.NoError(t, run(t, s, "apply", "--config", cfg))
+		policy, err := vc.Read(ctx, "sys/policies/acl/grafana")
+		require.NoError(t, err)
+		assert.Contains(t, policy["policy"], "kv/data/grafana/*")
+
+		fixed, err := vc.KvV2Read(ctx, "kv", "grafana/admin")
+		require.NoError(t, err)
+		assert.Equal(t, "admin", fixed["username"])
+		assert.Equal(t, password, fixed["password"])
+		assert.Equal(t, "kept", fixed["added-by-hand"], "undeclared keys survive")
+	})
+
+	t.Run("rotate replaces generated values only", func(t *testing.T) {
+		require.NoError(t, run(t, s, "secret", "apply", "--rotate", "--config", cfg))
+
+		rotated, err := vc.KvV2Read(ctx, "kv", "grafana/admin")
+		require.NoError(t, err)
+		assert.NotEqual(t, password, rotated["password"])
+		assert.Equal(t, "admin", rotated["username"])
+	})
+}
+
+// The direct commands change one object at a time, through the same engine as apply.
+func TestDirectCommands(t *testing.T) {
+	asrt := assert.New(t)
+	addr := vaulttest.StartDev(t)
+	ctx := t.Context()
+	s := newState(t)
+	vc := rootClient(t, addr, vaulttest.RootToken)
+	conn := []string{"--vault-addr", addr, "--token", vaulttest.RootToken, "--via", "direct"}
+
+	policyFile := filepath.Join(t.TempDir(), "app.hcl")
+	require.NoError(t, os.WriteFile(policyFile, []byte(`path "kv/data/app/*" { capabilities = ["read"] }`), 0o600))
+	passwordFile := filepath.Join(t.TempDir(), "strong.hcl")
+	require.NoError(t, os.WriteFile(passwordFile, []byte("length = 24\nrule \"charset\" {\n  charset = \"abc\"\n}\n"), 0o600))
+
+	for _, args := range [][]string{
+		{"mount", "enable", "kv", "--type", "kv-v2"},
+		{"auth", "enable", "kubernetes", "--type", "kubernetes",
+			"--kubernetes-host", "https://kubernetes.default.svc", "--kubernetes-ca-cert", writeCA(t)},
+		{"password-policy", "write", "strong", "--file", passwordFile},
+		{"policy", "write", "app", "--file", policyFile},
+		{"role", "write", "app", "--service-account", "app", "--service-account-namespace", "apps",
+			"--policy", "app", "--token-ttl", "1h"},
+		{"secret", "write", "kv/app/config", "--set", "user=app", "--generate", "password=strong"},
+	} {
+		require.NoError(t, run(t, s, append(args, conn...)...), "waltr %v", args)
 	}
+
+	role, err := vc.Read(ctx, "auth/kubernetes/role/app")
+	require.NoError(t, err)
+	asrt.Equal("3600", fmt.Sprint(role["token_ttl"]))
+
+	secret, err := vc.KvV2Read(ctx, "kv", "app/config")
+	require.NoError(t, err)
+	asrt.Equal("app", secret["user"])
+	asrt.Len(secret["password"], 24)
+
+	// re-enabling at a path with a different engine is refused, not a remount
+	err = run(t, s, append([]string{"mount", "enable", "kv", "--type", "transit"}, conn...)...)
+	asrt.ErrorContains(err, "never remounts")
+}
+
+// A group's apply only touches its own section.
+func TestGroupApply(t *testing.T) {
+	addr := vaulttest.StartDev(t)
+	s := newState(t)
+	vc := rootClient(t, addr, vaulttest.RootToken)
+
+	require.NoError(t, run(t, s, "policy", "apply", "--config", exampleFor(t, addr)))
+
+	policies, err := vc.PoliciesListAclPolicies(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, policies, "grafana")
+
+	engines, err := vc.MountsListSecretsEngines(t.Context())
+	require.NoError(t, err)
+	assert.NotContains(t, engines, "kv/", "policy apply must not mount engines")
+}
+
+func TestApplyNeedsAVaultSection(t *testing.T) {
+	s := newState(t)
+	path := filepath.Join(t.TempDir(), "waltr.yaml")
+	require.NoError(t, os.WriteFile(path, []byte("vault-addr: https://vault.example.org\n"), 0o600))
+
+	err := run(t, s, "apply", "--config", path, "--token", "x")
+	assert.ErrorContains(t, err, "has no vault: section")
 }
 
 // writeCA writes a self-signed CA certificate, standing in for the Kubernetes API server's, which
@@ -261,6 +386,6 @@ func writeCA(t *testing.T) string {
 func TestCommandsNeedAnAddress(t *testing.T) {
 	s := newState(t)
 
-	err := run(t, s, "configure", "--token", "x")
+	err := run(t, s, "mount", "enable", "kv", "--type", "kv-v2", "--token", "x")
 	assert.ErrorContains(t, err, "vault-addr")
 }

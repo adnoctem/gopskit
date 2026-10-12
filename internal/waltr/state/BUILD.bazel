@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "state",
+    srcs = [
+        "document.go",
+        "engine.go",
+    ],
+    importpath = "github.com/adnoctem/gopskit/internal/waltr/state",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//pkg/api/vault",
+        "@com_github_hashicorp_vault_client_go//schema",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":state",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "state_test",
+    srcs = ["document_test.go"],
+    embed = [":state"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+    ],
+)
