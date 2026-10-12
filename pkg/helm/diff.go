@@ -2,10 +2,11 @@ package helm
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/pmezard/go-difflib/difflib"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
-	"k8s.io/utils/diff"
 )
 
 // CurrentManifest fetches the manifest of name's latest deployed release from the cluster
@@ -38,13 +39,43 @@ func (c *Client) RenderManifest(name string, ch *chart.Chart, vals map[string]in
 	return rel.Manifest, nil
 }
 
-// ManifestDiff renders a human-readable delta between two manifests, or an empty string if they're
-// identical - diff.StringDiff itself always returns a non-empty result, even for equal inputs.
-// Callers wanting to ignore metadata noise should normalize both manifests beforehand.
+// ManifestDiff renders a unified diff from current to proposed - the deployed and the rendered
+// manifest - with three lines of context, or an empty string if they're identical. Callers wanting
+// to ignore metadata noise should normalize both manifests beforehand.
 func ManifestDiff(current, proposed string) string {
 	if current == proposed {
 		return ""
 	}
 
-	return diff.StringDiff(current, proposed)
+	diff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+		A:        splitLines(current),
+		B:        splitLines(proposed),
+		FromFile: "deployed",
+		ToFile:   "rendered",
+		Context:  3,
+	})
+	if err != nil {
+		// GetUnifiedDiffString only fails when writing to its in-memory buffer fails
+		return fmt.Sprintf("could not compute the diff: %v", err)
+	}
+
+	return diff
+}
+
+// splitLines splits s into lines that keep their newline, as the diff expects. difflib's own
+// SplitLines appends an empty line that shows up in the diff as a phantom line of context.
+func splitLines(s string) []string {
+	if s == "" {
+		return nil
+	}
+
+	lines := strings.SplitAfter(s, "\n")
+	if lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	} else {
+		// a last line without a newline still has to end one for the diff's layout
+		lines[len(lines)-1] += "\n"
+	}
+
+	return lines
 }

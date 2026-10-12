@@ -16,7 +16,7 @@ var _ app.CLIOpt = NewDiffCommand // assure type compatibility
 func NewDiffCommand(a *app.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              "diff <chart>",
-		Short:            "Show how the local chart render differs from the deployed release",
+		Short:            "Show a unified diff from the deployed release to the local chart render",
 		Long:             "Performs a client-only dry-run render of the chart and compares it against the currently deployed release manifest",
 		Args:             cobra.ExactArgs(1),
 		TraverseChildren: true,
@@ -71,7 +71,7 @@ func NewDiffCommand(a *app.State) *cobra.Command {
 				return nil
 			}
 
-			fmt.Printf("Infrastructure Changes:\n%s\n", d)
+			fmt.Print(d)
 			return nil
 		},
 	}

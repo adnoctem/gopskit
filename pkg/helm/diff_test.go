@@ -48,5 +48,21 @@ func TestManifestDiff(t *testing.T) {
 	asrt := assert.New(t)
 
 	asrt.Empty(ManifestDiff("same", "same"))
-	asrt.NotEmpty(ManifestDiff("old", "new"))
+
+	deployed := "kind: ConfigMap\nmetadata:\n  name: app\ndata:\n  replicas: \"1\"\n  log: info\n"
+	rendered := "kind: ConfigMap\nmetadata:\n  name: app\ndata:\n  replicas: \"3\"\n  log: info\n"
+
+	asrt.Equal(`--- deployed
++++ rendered
+@@ -2,5 +2,5 @@
+ metadata:
+   name: app
+ data:
+-  replicas: "1"
++  replicas: "3"
+   log: info
+`, ManifestDiff(deployed, rendered), "a unified diff of only the changed line, with context")
+
+	everything := ManifestDiff("", "kind: ConfigMap\n")
+	asrt.Contains(everything, "+kind: ConfigMap", "against an empty manifest every line is an addition")
 }

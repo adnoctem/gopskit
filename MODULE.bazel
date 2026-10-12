@@ -30,6 +30,7 @@ use_repo(
     "com_github_moby_term",
     "com_github_nerzal_gocloak_v14",
     "com_github_olekukonko_tablewriter",
+    "com_github_pmezard_go_difflib",
     "com_github_spf13_cobra",
     "com_github_spf13_pflag",
     "com_github_stretchr_testify",

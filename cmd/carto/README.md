@@ -219,10 +219,20 @@ carto diff vault -e prod
 ```
 
 Renders the chart's manifests with the merged values and compares them with the manifest of the
-deployed release. When they are identical it prints `no differences`. Otherwise it prints
-`Infrastructure Changes:`, followed by the text both have in common, then the rest of the deployed
-manifest after `A:` and the rest of the new one after `B:`. It is not a line-by-line diff: the
-comparison stops at the first character that differs, and everything after it is printed in full.
+deployed release. When they are identical it prints `no differences`. Otherwise it prints a unified
+diff from the deployed manifest (`--- deployed`) to the rendered one (`+++ rendered`), with three
+lines of context around each change - the format `diff -u` and `git diff` use:
+
+```diff
+--- deployed
++++ rendered
+@@ -12,7 +12,7 @@
+ spec:
+   template:
+     spec:
+-      replicas: 1
++      replicas: 3
+```
 
 When the chart is not installed, carto says so and compares against an empty manifest, so the
 output shows everything an install would create. Any other error while reading the release - no
