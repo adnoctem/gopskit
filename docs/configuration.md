@@ -1,8 +1,9 @@
 # Configuring the gopskit CLIs
 
-Every flag of `ssolo` and `waltr` can also be set through the environment (where noted) or a
-configuration file, so repetitive administration - or a tool like Ansible - doesn't have to repeat
-the same flags on every call.
+Every flag of the gopskit CLIs - `carto`, `plattr`, `ssolo`, `steppa` and `waltr` - can also be set
+through the environment (where noted) or a configuration file, so repetitive administration - or a
+tool like Ansible - doesn't have to repeat the same flags on every call. Each CLI's own README in
+`cmd/<cli>/` documents its flags; this page describes what they share.
 
 ## Where settings come from
 
@@ -91,17 +92,37 @@ ssolo client apply vaultwarden \
 
 ## Environment variables
 
-| CLI     | Flag                         | Variable                  |
-| ------- | ---------------------------- | ------------------------- |
-| `ssolo` | `--url`                      | `KEYCLOAK_URL`            |
-| `ssolo` | `--username`                 | `KEYCLOAK_ADMIN`          |
-| `ssolo` | `--password`                 | `KEYCLOAK_ADMIN_PASSWORD` |
-| `ssolo` | `client apply --vault-addr`  | `VAULT_ADDR`              |
-| `ssolo` | `client apply --vault-token` | `VAULT_TOKEN`             |
-| `waltr` | `--vault-addr`               | `VAULT_ADDR`              |
-| `waltr` | `--token`                    | `VAULT_TOKEN`             |
-| `waltr` | `--ca-cert`                  | `VAULT_CACERT`            |
-| `waltr` | `--insecure-skip-tls-verify` | `VAULT_SKIP_VERIFY`       |
+| CLI      | Flag                                                       | Variable                       |
+| -------- | ---------------------------------------------------------- | ------------------------------ |
+| `plattr` | `aws --access-key-id`                                      | `AWS_ACCESS_KEY_ID`            |
+| `plattr` | `aws --secret-access-key`                                  | `AWS_SECRET_ACCESS_KEY`        |
+| `plattr` | `cloudflare --token`                                       | `CLOUDFLARE_API_TOKEN`         |
+| `plattr` | `hetzner-encryption`, `longhorn-encryption` `--passphrase` | `PLATTR_ENCRYPTION_PASSPHRASE` |
+| `ssolo`  | `--url`                                                    | `KEYCLOAK_URL`                 |
+| `ssolo`  | `--username`                                               | `KEYCLOAK_ADMIN`               |
+| `ssolo`  | `--password`                                               | `KEYCLOAK_ADMIN_PASSWORD`      |
+| `ssolo`  | `client apply --vault-addr`                                | `VAULT_ADDR`                   |
+| `ssolo`  | `client apply --vault-token`                               | `VAULT_TOKEN`                  |
+| `steppa` | `init --root-password`                                     | `STEPPA_ROOT_PASSWORD`         |
+| `steppa` | `init --password`                                          | `STEPPA_PASSWORD`              |
+| `steppa` | `init --provisioner-password`                              | `STEPPA_PROVISIONER_PASSWORD`  |
+| `steppa` | `init --ssh-host-password`                                 | `STEPPA_SSH_HOST_PASSWORD`     |
+| `steppa` | `init --ssh-user-password`                                 | `STEPPA_SSH_USER_PASSWORD`     |
+| `steppa` | `init --vault-addr`                                        | `VAULT_ADDR`                   |
+| `steppa` | `init --vault-token`                                       | `VAULT_TOKEN`                  |
+| `waltr`  | `--vault-addr`                                             | `VAULT_ADDR`                   |
+| `waltr`  | `--token`                                                  | `VAULT_TOKEN`                  |
+| `waltr`  | `--ca-cert`                                                | `VAULT_CACERT`                 |
+| `waltr`  | `--insecure-skip-tls-verify`                               | `VAULT_SKIP_VERIFY`            |
 
 `waltr` reads the same variables as the `vault` CLI, so an environment set up for one works for
-the other.
+the other. Secrets are better passed this way, or in a file readable only by you, than as
+command-line arguments, which end up in shell history and the process list.
+
+## Choosing the cluster
+
+The CLIs that talk to Kubernetes find the kubeconfig the way `kubectl` does: `--kubeconfig`, else
+the files in `$KUBECONFIG`, else `~/.kube/config` - falling back to
+`~/.config/gopskit/kubeconfig` and, inside a Pod, the in-cluster configuration. `--context`
+selects a context other than the current one. Both can be set in the configuration file like any
+other flag.

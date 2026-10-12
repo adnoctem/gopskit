@@ -40,13 +40,18 @@ bazel build //...
 
 ## 🛠️ Tools
 
-Like most modern [Go][go] projects the various executables are located within the [cmd][cmd] directory. Here's a
-quick-reference list as an overview:
+Like most modern [Go][go] projects the various executables are located within the [cmd][cmd] directory, each with
+its own README documenting how to use it. Here's a quick-reference list as an overview:
 
 - [`carto`][carto]: manage Kubernetes backbone components (Helm charts) with the Helm SDK
-- [`ssolo`][ssolo]: manage SSO authentication for various apps using Keycloak
-- [`waltr`][waltr]: configure and manage [HashiCorp's Vault][vault]
-- [`steppa`][steppa]: generate and manage SmallStep PKI values
+- [`plattr`][plattr]: create a platform cluster's provider credentials, volume encryption and DH parameter Secrets
+- [`ssolo`][ssolo]: set up Keycloak realms and the OIDC clients applications sign their users in with
+- [`steppa`][steppa]: create a private certificate authority for [Smallstep's step-ca][smallstep_certificates]
+- [`waltr`][waltr]: initialize, unseal and configure [HashiCorp's Vault][vault]
+
+Every flag can also be set in a configuration file or, for secrets, the environment - see
+[configuring the CLIs][configuration]. Services inside a cluster are reached through the [gopskit
+bridge][bridge], which the CLIs set up with `<cli> proxy setup`.
 
 ### 🔃 Contributing
 
@@ -71,12 +76,15 @@ for more information. You may also use the linked contact details to reach out d
 [ssolo]: cmd/ssolo
 [waltr]: cmd/waltr
 [steppa]: cmd/steppa
+[plattr]: cmd/plattr
 [carto]: cmd/carto
 
 <!-- File references -->
 
 [license]: LICENSE
 [contributing]: docs/CONTRIBUTING.md
+[configuration]: docs/configuration.md
+[bridge]: cmd/gopskit-bridge
 [authors]: .github/AUTHORS
 [owners]: .github/CODEOWNERS
 [ci_testing_workflow]: https://github.com/adnoctem/gopskit/actions/workflows/testing.yaml
