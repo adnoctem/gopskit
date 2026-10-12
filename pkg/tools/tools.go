@@ -1,4 +1,4 @@
-// Package tools implements the API to other tools like Helmfile, or Smallstep's 'step' CLI
+// Package tools implements the API to other tools like Helmfile
 // Initially I wanted to compile in the direct sources from their respective Go modules
 //
 // However, Bazel struggles with compilation of the dependencies, mainly due to issues with the

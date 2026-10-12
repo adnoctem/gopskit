@@ -23,7 +23,6 @@ var (
 	GenerateSubcommands = []app.CLIOpt{
 		NewGeneratePassphraseCommand,
 		NewGenerateDHParamsCommand,
-		NewGenerateSmallstepValues,
 	}
 )
 

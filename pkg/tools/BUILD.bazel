@@ -4,7 +4,6 @@ go_library(
     name = "tools",
     srcs = [
         "helm.go",
-        "smallstep.go",
         "tools.go",
     ],
     importpath = "github.com/adnoctem/gopskit/pkg/tools",
