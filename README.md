@@ -1,9 +1,6 @@
 <p align="center">
     <!-- Go Operations Toolkit -->
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/adnoctem/artwork/blob/4a43cf6856b3d5d98998c215bc09252c060e56ba/projects/gopskit/icon/white/gopskit-icon-white.png?raw=true">
-      <img src="https://github.com/adnoctem/artwork/blob/4a43cf6856b3d5d98998c215bc09252c060e56ba/projects/gopskit/icon/color/gopskit-icon-color.png?raw=true" alt="GOpsKit Logo" width="225">
-    </picture>
+    <img src="https://github.com/adnoctem/artwork/blob/8a9d84ca8d91a61bd1f69fdc1ba6362ccbcb5060/projects/gopskit/icon/gopskit.svg?raw=true" alt="GOpsKit Logo" width="256">
     <h1 align="center">Go Operations Toolkit</h1>
 </p>
 
