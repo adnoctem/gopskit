@@ -40,7 +40,8 @@ ssolo proxy check --target keycloak.keycloak.svc:8443
 # 2. Create the realms "operations" and "applications", each with the groups
 #    "admins" and "users".
 export KEYCLOAK_URL=https://keycloak.keycloak.svc:8443
-ssolo init --credentials-secret keycloak/keycloak-admin --ca-cert /etc/ssl/private-ca.pem
+ssolo init --credentials-secret keycloak/keycloak-admin --ca-cert /etc/ssl/private-ca.pem \
+  --realms operations,applications --groups admins,users
 
 # 3. Create the client for an application and store its settings in a Secret
 #    next to it.
@@ -116,8 +117,9 @@ again with the credentials it was given.
 ssolo initialize            # or: ssolo init
 ```
 
-Creates each realm in `--realms` (default `operations,applications`), and in each of those realms
-each group in `--groups` (default `admins,users`). A realm or group that already exists is left as
+Creates each realm in `--realms`, and in each of those realms each group in `--groups`. Both are
+your cluster's own names, so neither has a default: `--realms` is required, and without `--groups`
+only the realms are created. A realm or group that already exists is left as
 it is, so the command can run on every deployment.
 
 ```sh
@@ -132,8 +134,8 @@ New realms are enabled, and their display name is derived from the realm name.
 ssolo client apply CLIENT_ID --redirect-uri URI [flags]    # alias: ssolo client create
 ```
 
-Creates the OpenID Connect client an application signs its users in with, in `--realm` (default
-`applications`), or brings an existing client with that client ID in line with the flags.
+Creates the OpenID Connect client an application signs its users in with, in `--realm`
+(required), or brings an existing client with that client ID in line with the flags.
 
 | Flag                         | Default                      | Meaning                                                                |
 | ---------------------------- | ---------------------------- | ---------------------------------------------------------------------- |
@@ -143,7 +145,7 @@ Creates the OpenID Connect client an application signs its users in with, in `--
 | `--root-url`                 |                              | The application's base URL.                                            |
 | `--name`                     |                              | The client's display name.                                             |
 | `--public`                   | `false`                      | A public client: no secret, PKCE required.                             |
-| `--realm`                    | `applications`               | The realm the client belongs to.                                       |
+| `--realm`                    |                              | The realm the client belongs to. Required.                             |
 | `--public-url`               | `--url`                      | Keycloak as the application reaches it; see [the issuer](#the-issuer). |
 
 ### What apply changes

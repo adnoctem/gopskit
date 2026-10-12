@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/Nerzal/gocloak/v14"
@@ -27,6 +28,10 @@ func NewInitCommand(ssolo *app.State) *cobra.Command {
 their users in with. Safe to run repeatedly: what already exists is left as it is.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+
+			if len(realms) == 0 {
+				return errors.New("no realms to create: set --realms or realms in the configuration file")
+			}
 
 			release, err := kf.connect(ctx, ssolo)
 			if err != nil {
@@ -79,8 +84,8 @@ their users in with. Safe to run repeatedly: what already exists is left as it i
 	}
 
 	kf.add(cmd)
-	cmd.Flags().StringSliceVar(&realms, "realms", []string{"operations", "applications"}, "The realms to create")
-	cmd.Flags().StringSliceVar(&groups, "groups", []string{"admins", "users"}, "The groups to create in each realm")
+	cmd.Flags().StringSliceVar(&realms, "realms", nil, "The realms to create (required)")
+	cmd.Flags().StringSliceVar(&groups, "groups", nil, "The groups to create in each realm")
 
 	return cmd
 }

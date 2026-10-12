@@ -158,7 +158,7 @@ initialize:
 		require.NoError(t, err)
 
 		args := append([]string{
-			"client", "apply", "vaultwarden",
+			"client", "apply", "vaultwarden", "--realm", "applications",
 			"--redirect-uri", "https://vault.example.org/identity/connect/oidc-signin",
 			"--public-url", "https://sso.example.org",
 			"-o", "stdout,kubernetes,vault", "--format", "json",
@@ -245,8 +245,19 @@ func TestClientApplyNeedsURL(t *testing.T) {
 	t.Setenv("KEYCLOAK_URL", "")
 	s, _ := newState(t)
 
-	_, err := run(t, s, "client", "apply", "x", "--redirect-uri", "https://x/cb")
+	_, err := run(t, s, "client", "apply", "x", "--realm", "apps", "--redirect-uri", "https://x/cb")
 	assert.ErrorContains(t, err, "URL of Keycloak is required")
+}
+
+// Realm names are the cluster's own, so there are none to assume.
+func TestRealmsMustBeNamed(t *testing.T) {
+	s, _ := newState(t)
+
+	_, err := run(t, s, "init", "--url", "https://sso.example.org")
+	assert.ErrorContains(t, err, "--realms")
+
+	_, err = run(t, s, "client", "apply", "x", "--url", "https://sso.example.org", "--redirect-uri", "https://x/cb")
+	assert.ErrorContains(t, err, "--realm")
 }
 
 func TestShellQuote(t *testing.T) {

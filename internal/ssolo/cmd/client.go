@@ -111,6 +111,9 @@ For example, for Vaultwarden:
 				return err
 			}
 
+			if realm == "" {
+				return errors.New("the realm of the client is required: set --realm or realm in the configuration file")
+			}
 			if kf.url == "" {
 				return errors.New("the URL of Keycloak is required: set --url, $KEYCLOAK_URL or url in the configuration file")
 			}
@@ -151,7 +154,7 @@ For example, for Vaultwarden:
 	out.conn = &kf.conn
 
 	fs := cmd.Flags()
-	fs.StringVar(&realm, "realm", "applications", "The realm the client belongs to")
+	fs.StringVar(&realm, "realm", "", "The realm the client belongs to (required)")
 	fs.StringVar(&publicURL, "public-url", "",
 		"Keycloak's URL as the application reaches it, which the issuer is derived from (default: --url)")
 	fs.StringVar(&spec.Name, "name", "", "The client's display name")
