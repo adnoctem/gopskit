@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/adnoctem/gopskit/internal/waltr/app"
@@ -46,7 +47,9 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 
 			// enable transit-encryption
 			const tep = "transit/"
-			if !helpers.SliceContains(s, tep) || overwrite {
+			// the engine is only ever enabled once: re-enabling a mounted path fails, and
+			// remounting it would destroy its keys
+			if !helpers.SliceContains(s, tep) {
 				err := app.Vault.MountsEnableSecretsEngine(context.Background(),
 					strings.TrimSuffix(tep, "/"),
 					schema.MountsEnableSecretsEngineRequest{
@@ -89,7 +92,8 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 
 			const p = "vso-auth"
 			if !helpers.SliceContains(pol, p) || overwrite {
-				err := app.Vault.PoliciesWriteAclPolicy(context.Background(), p, fmt.Sprintf(util.ConfigReleasePolicyTemplate, p))
+				// what the Vault Secrets Operator's client cache does with the key: encrypt and decrypt
+				err := app.Vault.PoliciesWriteAclPolicy(context.Background(), p, util.TRANSIT_ENCRYPTION_POLICY)
 				if err != nil {
 					return err
 				}
@@ -111,22 +115,8 @@ func NewTransitCommand(app *app.State) *cobra.Command {
 					BoundServiceAccountNames:      []string{"vault-secrets-operator"},
 					BoundServiceAccountNamespaces: []string{"vault-secrets-operator"},
 					TokenPeriod:                   "120",
-					TokenPolicies: []string{
-						"keycloak",
-						"awx",
-						"crowdsec",
-						"gitlab",
-						"gitlab-runner",
-						"harbor",
-						"headlamp",
-						"homepage",
-						"jenkins",
-						"kubescape",
-						"loki",
-						"matomo",
-						p,
-					},
-					TokenTtl: "0",
+					TokenPolicies:                 append(slices.Clone(util.Releases), p),
+					TokenTtl:                      "0",
 				})
 
 				if err != nil {

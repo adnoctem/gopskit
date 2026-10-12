@@ -134,6 +134,28 @@ func TestInitializeAndUnseal(t *testing.T) {
 	asrt.Equal(creds.Token, again.Token)
 }
 
+// With auto-unseal, a fresh Vault is initialized with recovery keys and never unsealed by waltr;
+// the first run used to fail afterwards, looking for unseal keys there are none of.
+func TestInitializeWithAutoUnseal(t *testing.T) {
+	addr := vaulttest.StartServer(t)
+	ctx := t.Context()
+
+	pods := []corev1.Pod{vaultPod("vault-0")}
+	s := newState(t, pods...)
+
+	vf := vaultFlags{}
+	vf.conn.Via = "direct"
+	reach := func(ctx context.Context, _ corev1.Pod) (func(), error) { return vf.dial(ctx, s, addr) }
+
+	// needsUnseal=false is what a chart with a seal stanza yields; the test server has no real
+	// auto-unseal, so it is initialized with unseal keys, which must still be stored
+	require.NoError(t, initializeAndUnseal(ctx, s, core.Development, initOptions{threshold: 3, shares: 5}, pods[0], pods, false, reach))
+
+	creds, err := util.ReadCredentials(s, core.Development)
+	require.NoError(t, err)
+	assert.NotEmpty(t, creds.Token)
+}
+
 // TestCommandsAgainstVault runs the configuration commands in the order a bootstrap does, with
 // every connection setting coming from waltr.yaml.
 func TestCommandsAgainstVault(t *testing.T) {
@@ -188,6 +210,20 @@ mounts:
 	acl, err := vc.Read(ctx, "sys/policies/acl/keycloak")
 	require.NoError(t, err)
 	asrt.Contains(acl["policy"], "kv/data/manual")
+
+	// the transit policy must grant what the operator's client cache does with the key
+	vso, err := vc.Read(ctx, "sys/policies/acl/vso-auth")
+	require.NoError(t, err)
+	asrt.Contains(vso["policy"], "transit/encrypt/vso-client-cache")
+
+	// re-running with --overwrite must work, not trip over the mounted engine
+	require.NoError(t, run(t, s, "transit", "--overwrite", "--config", path))
+
+	// and mounts --overwrite rewrites the Kubernetes auth configuration
+	require.NoError(t, run(t, s, "mounts", "--overwrite", "--kubernetes-host", "https://api.example.org:6443", "--config", path))
+	k8s, err = vc.Read(ctx, "auth/kubernetes/config")
+	require.NoError(t, err)
+	asrt.Equal("https://api.example.org:6443", k8s["kubernetes_host"])
 
 	for _, secret := range []string{"keycloak/config", "keycloak/credentials/postgresql"} {
 		data, err := vc.KvV2Read(ctx, "kv", secret)

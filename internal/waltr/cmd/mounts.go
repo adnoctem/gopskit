@@ -20,6 +20,7 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 		vf               vaultFlags
 		kubernetesHost   string
 		kubernetesCACert string
+		overwrite        bool
 	)
 
 	cmd := &cobra.Command{
@@ -48,19 +49,25 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 
 			// enable Kubernetes
 			const kp = "kubernetes/"
-			if !helpers.SliceContains(m, kp) {
-				// enable
+			enabled := helpers.SliceContains(m, kp)
+			if !enabled {
 				err = app.Vault.AuthEnableMethod(context.Background(), strings.TrimSuffix(kp, "/"),
 					schema.AuthEnableMethodRequest{
 						Description: "authenticate with Kubernetes Service Account Tokens",
 						Type:        strings.TrimSuffix(kp, "/"),
 					})
-
 				if err != nil {
 					return fmt.Errorf("could not enable Vault authentication method Kubernetes. Error: %v", err)
 				}
 
-				// configure; inside the cluster Vault finds the API server's CA in its own Pod
+				app.Log.Info("Enabled Vault authentication method Kubernetes")
+			} else {
+				app.Log.Info("Vault authentication method Kubernetes already enabled")
+			}
+
+			// configure it when it was just enabled, or with --overwrite - e.g. after the API
+			// server's address or CA changed. Inside the cluster Vault finds the CA in its own Pod.
+			if !enabled || overwrite {
 				req := schema.KubernetesConfigureAuthRequest{KubernetesHost: kubernetesHost}
 				if kubernetesCACert != "" {
 					pem, err := os.ReadFile(kubernetesCACert)
@@ -70,15 +77,11 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 					req.KubernetesCaCert = string(pem)
 				}
 
-				err = app.Vault.KubernetesConfigureAuth(context.Background(), strings.TrimSuffix(kp, "/"), req)
-
-				if err != nil {
+				if err := app.Vault.KubernetesConfigureAuth(context.Background(), strings.TrimSuffix(kp, "/"), req); err != nil {
 					return fmt.Errorf("could not configure Vault authentication method Kubernetes: %v", err)
 				}
 
-				app.Log.Info("Enabled Vault authentication method Kubernetes")
-			} else {
-				app.Log.Info("Vault authentication method Kubernetes already enabled")
+				app.Log.Infof("configured Vault authentication method Kubernetes for %s", kubernetesHost)
 			}
 
 			// enable OIDC
@@ -136,6 +139,7 @@ func NewMountsCommand(app *app.State) *cobra.Command {
 	vf.add(cmd, true)
 	cmd.Flags().StringVar(&kubernetesHost, "kubernetes-host", "https://kubernetes.default.svc",
 		"The Kubernetes API server address Vault's Kubernetes auth method uses, as Vault reaches it")
+	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "Rewrite the Kubernetes auth method's configuration from the flags")
 	cmd.Flags().StringVar(&kubernetesCACert, "kubernetes-ca-cert", "",
 		"A PEM file with the Kubernetes API server's CA, for a Vault running outside the cluster (default: Vault's own Pod's)")
 

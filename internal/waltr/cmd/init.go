@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/adnoctem/gopskit/internal/waltr/app"
 	cmdutil "github.com/adnoctem/gopskit/internal/waltr/util"
@@ -102,7 +103,8 @@ is skipped when the chart configures auto-unseal.`,
 	}
 
 	vf.add(cmd, false)
-	cmd.Flags().BoolVar(&opts.highAvailability, "high-availability", false, "Ensure Vault is running in HA mode")
+	cmd.Flags().BoolVar(&opts.highAvailability, "high-availability", false,
+		"Initialize with recovery keys instead of unseal keys, as Vault requires with auto-unseal")
 	cmd.Flags().IntVar(&opts.threshold, "threshold", 4, "The threshold of recovery keys required to unlock Vault")
 	cmd.Flags().IntVar(&opts.shares, "shares", 7, "The amount of total recovery key shares Vault emits")
 	cmd.Flags().StringVar(&opts.secretFile, "secret-file", "",
@@ -212,7 +214,9 @@ func initializeAndUnseal(
 		}
 	}
 
-	if !needsUnseal && status.Initialized {
+	// with auto-unseal Vault unseals itself, freshly initialized or not, and there are no unseal
+	// keys - only recovery keys
+	if !needsUnseal {
 		app.Log.Info("skipping Vault unseal - Auto-Unseal is enabled")
 		return nil
 	}
@@ -251,9 +255,12 @@ func initialize(ctx context.Context, app *app.State, environment core.Environmen
 	}
 
 	creds := &apivault.Credentials{
-		Keys:    res.Keys,
-		KeysB64: res.KeysB64,
-		Token:   res.RootToken,
+		Keys:            res.Keys,
+		KeysB64:         res.KeysB64,
+		RecoveryKeys:    res.RecoveryKeys,
+		RecoveryKeysB64: res.RecoveryKeysB64,
+		Token:           res.RootToken,
+		Created:         time.Now(),
 	}
 
 	// always keep a copy at the credential path, which later commands read

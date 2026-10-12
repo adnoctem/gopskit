@@ -29,11 +29,18 @@ type Credentials struct {
 	// Created is a timestamp to know when the credentials were created
 	Created time.Time `json:"created,omitempty"`
 
-	// Keys are the Vault unseal (or recovery) keys
+	// Keys are the Vault unseal keys
 	Keys []string `json:"keys,omitempty"`
 
-	// KeysB64 are the Vault unseal (or recovery) keys, base64-encoded
+	// KeysB64 are the Vault unseal keys, base64-encoded
 	KeysB64 []string `json:"keys_base64,omitempty"`
+
+	// RecoveryKeys are the recovery keys Vault issues instead of unseal keys with auto-unseal;
+	// they authorise operations such as generating a new root token
+	RecoveryKeys []string `json:"recovery_keys,omitempty"`
+
+	// RecoveryKeysB64 are the recovery keys, base64-encoded
+	RecoveryKeysB64 []string `json:"recovery_keys_base64,omitempty"`
 
 	// Token is the Vault root/auth token, used to authenticate to the API
 	Token string `json:"token,omitempty"`
