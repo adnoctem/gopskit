@@ -46,10 +46,10 @@ go_test(
     deps = [
         "//pkg/bridge/socks5",
         "//pkg/kube",
+        "//pkg/kube/k3stest",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@com_github_testcontainers_testcontainers_go//:testcontainers-go",
-        "@com_github_testcontainers_testcontainers_go_modules_k3s//:k3s",
         "@io_k8s_api//apps/v1:apps",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_api//networking/v1:networking",

@@ -16,20 +16,16 @@ import (
 	"github.com/adnoctem/gopskit/pkg/bridge"
 	"github.com/adnoctem/gopskit/pkg/bridge/socks5"
 	"github.com/adnoctem/gopskit/pkg/kube"
+	"github.com/adnoctem/gopskit/pkg/kube/k3stest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/k3s"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
-	// k3sImage is the cluster the end-to-end test runs against. k3s enforces NetworkPolicies
-	// out of the box, which the policy subtest relies on.
-	k3sImage = "rancher/k3s:v1.36.5-k3s1"
-
 	// bridgeImage is the tag the image tarball carries; see //cmd/gopskit-bridge:load.
 	bridgeImage = "gopskit-bridge:dev"
 
@@ -153,9 +149,7 @@ func TestBridgeEndToEnd(t *testing.T) {
 func startCluster(t *testing.T, ctx context.Context, tarPath string) *kube.Client {
 	t.Helper()
 
-	ctr, err := k3s.Run(ctx, k3sImage)
-	testcontainers.CleanupContainer(t, ctr)
-	require.NoError(t, err)
+	ctr, kc := k3stest.Start(t)
 
 	const inContainer = "/tmp/gopskit-bridge.tar"
 	require.NoError(t, ctr.CopyFileToContainer(ctx, tarPath, inContainer, 0o644))
@@ -165,24 +159,6 @@ func startCluster(t *testing.T, ctx context.Context, tarPath string) *kube.Clien
 	if code != 0 {
 		msg, _ := io.ReadAll(out)
 		t.Fatalf("importing the bridge image failed (exit %d): %s", code, msg)
-	}
-
-	cfg, err := ctr.GetKubeConfig(ctx)
-	require.NoError(t, err)
-
-	path := filepath.Join(t.TempDir(), "kubeconfig")
-	require.NoError(t, os.WriteFile(path, cfg, 0o600))
-
-	kc, err := kube.NewClient(kube.WithConfigPath(path))
-	require.NoError(t, err)
-
-	// a fresh k3s answers API requests before its add-ons run; cluster DNS in particular must be
-	// up before anything resolves service names through the bridge
-	for _, name := range []string{"coredns", "metrics-server"} {
-		require.Eventually(t, func() bool {
-			dep, err := kc.Client.AppsV1().Deployments("kube-system").Get(ctx, name, metav1.GetOptions{})
-			return err == nil && dep.Status.AvailableReplicas > 0
-		}, 3*time.Minute, time.Second, "kube-system/%s did not become available", name)
 	}
 
 	return kc

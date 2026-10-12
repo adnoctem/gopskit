@@ -1,0 +1,22 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "k3stest",
+    testonly = True,
+    srcs = ["k3stest.go"],
+    importpath = "github.com/adnoctem/gopskit/pkg/kube/k3stest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/kube",
+        "@com_github_testcontainers_testcontainers_go//:testcontainers-go",
+        "@com_github_testcontainers_testcontainers_go_modules_k3s//:k3s",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    testonly = True,
+    actual = ":k3stest",
+    visibility = ["//visibility:public"],
+)
