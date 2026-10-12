@@ -46,7 +46,7 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "GOPSKIT_VERSION=${nextRelease.version} scripts/release.sh executables && scripts/release.sh tarballs && scripts/release.sh checksums"
+        "prepareCmd": "scripts/release-create.sh --version ${nextRelease.version}"
       }
     ],
     [

@@ -21,7 +21,7 @@
 # Enable Bzlmod for every Bazel command
 common --enable_bzlmod
 
-build --workspace_status_command=$(pwd)/scripts/status.sh
+build --workspace_status_command=$(pwd)/scripts/bazel-create-status.sh
 build --verbose_failures
 
 test --test_env=HOME

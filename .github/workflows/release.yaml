@@ -29,6 +29,17 @@ jobs:
         with:
           persist-credentials: false
 
+      # scripts/release-create.sh, which semantic-release runs to build the artifacts, uses libsh.
+      # The version is pinned and the installer taken from that release's commit, not from main.
+      - name: Install libsh
+        env:
+          LIBSH_VERSION: "0.7.0"
+          LIBSH_COMMIT: 1f08d9b070e5d4da1e76bf66061e59b96295dbec # v0.7.0
+          LIBSH_INSTALL_DIR: ${{ runner.temp }}/libsh
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/adnoctem/libsh/${LIBSH_COMMIT}/bin/install" | bash
+          echo "LIBSH_DIR=${LIBSH_INSTALL_DIR}" >>"$GITHUB_ENV"
+
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6
         id: semantic
