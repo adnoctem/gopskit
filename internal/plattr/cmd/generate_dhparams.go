@@ -37,7 +37,7 @@ func NewGenerateDHParamsCommand(app *app.State) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().IntVar(&bits, "bits", helpers.DHParamDefaultBits, "The default amount of bits to generate parameters for")
+	cmd.PersistentFlags().IntVarP(&bits, "bits", "b", helpers.DHParamDefaultBits, "The amount of bits to generate")
 
 	return cmd
 }

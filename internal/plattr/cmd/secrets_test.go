@@ -119,3 +119,16 @@ func TestDHParamsAreStoredAsPEM(t *testing.T) {
 	require.NotNil(t, block, "dhparam.pem must hold PEM, got %q", raw)
 	assert.Equal(t, "DH PARAMETERS", block.Type)
 }
+
+func TestPassphraseRules(t *testing.T) {
+	t.Run("a given and a generated passphrase exclude each other", func(t *testing.T) {
+		err := run(t, newTestPlattrState(), "longhorn-encryption", "--passphrase", "x", "--generate-passphrase")
+		assert.ErrorContains(t, err, "exclude each other")
+	})
+
+	t.Run("a re-run needs no passphrase once the Secret exists", func(t *testing.T) {
+		state := newTestPlattrState()
+		require.NoError(t, run(t, state, "longhorn-encryption", "--generate-passphrase"))
+		assert.NoError(t, run(t, state, "longhorn-encryption"))
+	})
+}

@@ -38,15 +38,26 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
 
+			if generatePassphrase && passphrase != "" {
+				return errors.New("--generate-passphrase and a given passphrase exclude each other")
+			}
+
 			if generatePassphrase {
 				passphrase = helpers.GeneratePassphrase(
 					helpers.WithLength(passphraseLength),
 					helpers.WithCharSet(passphraseCharset))
 			}
 
-			// if still unset, fail
+			// an existing Secret is never replaced, so a passphrase is only needed to create one
 			if passphrase == "" {
-				return errors.New("cannot create Longhorn Volume Encryption secret without passphrase")
+				exists, err := secretExists(cmd.Context(), app, namespace, "longhorn-crypto")
+				if err != nil {
+					return err
+				}
+				if !exists {
+					return errors.New("cannot create the Longhorn Volume Encryption Secret without a passphrase: " +
+						"give --passphrase, $PLATTR_ENCRYPTION_PASSPHRASE or --generate-passphrase")
+				}
 			}
 
 			secret := &corev1.Secret{
@@ -76,7 +87,7 @@ func NewLonghornEncryptionCommand(app *app.State) *cobra.Command {
 
 			storageClass := &storagev1.StorageClass{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "v1",
+					APIVersion: "storage.k8s.io/v1",
 					Kind:       "StorageClass",
 				},
 				ObjectMeta: metav1.ObjectMeta{
