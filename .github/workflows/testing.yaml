@@ -47,18 +47,51 @@ jobs:
         with:
           extra_args: --all-files
 
+  # One job per CLI, so their container tests - Vault, Keycloak, step-ca, k3s - run side by side, a
+  # failure names the CLI it belongs to, and each job pulls only the images it needs. The last
+  # partition, "shared", is everything the others don't claim - the pkg/ libraries and anything added
+  # later - so a new package is tested even before it gets a partition of its own. A target in two
+  # partitions merely runs twice; none can be left out.
+  #
+  # Every partition runs on every change: the CLIs build on the shared libraries, so a change in
+  # pkg/ has to be tested against all of them.
   test:
-    name: Test
+    name: Test (${{ matrix.partition.name }})
     needs: [lint]
     strategy:
+      # see every partition's result, not just the first failure
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
+        partition:
+          - name: carto
+            targets: //cmd/carto/... //internal/carto/...
+          - name: plattr
+            targets: //cmd/plattr/... //internal/plattr/...
+          - name: ssolo
+            targets: //cmd/ssolo/... //internal/ssolo/...
+          - name: steppa
+            targets: //cmd/steppa/... //internal/steppa/...
+          - name: waltr
+            targets: //cmd/waltr/... //internal/waltr/...
+          - name: bridge
+            targets: //cmd/gopskit-bridge/... //internal/bridgecmd/... //pkg/bridge/...
+          - name: shared
+            targets: >-
+              //...
+              -//cmd/carto/... -//internal/carto/...
+              -//cmd/plattr/... -//internal/plattr/...
+              -//cmd/ssolo/... -//internal/ssolo/...
+              -//cmd/steppa/... -//internal/steppa/...
+              -//cmd/waltr/... -//internal/waltr/...
+              -//cmd/gopskit-bridge/... -//internal/bridgecmd/... -//pkg/bridge/...
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       packages: read
     env:
       CACHE_PATH: ${{ matrix.os == 'macos-latest' && '/private/var/tmp/_bazel_runner/' || '~/.cache/bazel' }}
+      TARGETS: ${{ matrix.partition.targets }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -69,40 +102,49 @@ jobs:
         uses: bazel-contrib/setup-bazel@c5acdfb288317d0b5c0bbd7a396a3dc868bb0f86 # 0.19.0
         with:
           bazelisk-cache: true
-          disk-cache: ${{ github.workflow }}
+          # per partition: the jobs run at once and would otherwise race to save one cache
+          disk-cache: ${{ github.workflow }}-${{ matrix.partition.name }}
           repository-cache: true
 
       - name: Cache Bazel
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ env.CACHE_PATH }}
-          key: ${{ runner.os }}-bazel-${{ hashFiles('.bazelversion', '.bazelrc', 'WORKSPACE', 'MODULE.bazel') }}
+          key: ${{ runner.os }}-bazel-${{ matrix.partition.name }}-${{ hashFiles('.bazelversion', '.bazelrc', 'WORKSPACE', 'MODULE.bazel') }}
           restore-keys: |
+            ${{ runner.os }}-bazel-${{ matrix.partition.name }}-
             ${{ runner.os }}-bazel-
 
+      # The patterns come through the environment rather than being templated into the script.
+      # `--` lets the shared partition's subtracted patterns, which start with a dash, through.
       - name: Build Bazel artifacts
         run: |
-          bazel --output_user_root=${{ env.CACHE_PATH }} build //...
+          read -ra targets <<<"$TARGETS"
+          bazel --output_user_root="$CACHE_PATH" build -- "${targets[@]}"
 
       - name: Test Bazel artifacts
         run: |
-          bazel --output_user_root=${{ env.CACHE_PATH }} test //... \
+          read -ra targets <<<"$TARGETS"
+          bazel --output_user_root="$CACHE_PATH" test \
             --@io_bazel_rules_go//go/config:race \
-            --test_output=errors
+            --test_output=errors \
+            -- "${targets[@]}"
 
   dispatch:
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    needs: [test]
+    needs: [lint, test]
     permissions:
       contents: write
       pull-requests: write
     steps:
       - name: Dispatch a release workflow run
-        # release only after every platform in the test matrix succeeded
+        # Release only after lint and every test partition succeeded. A matrix job's result is
+        # "success" only when all of its jobs succeeded; checking for that, rather than for the
+        # absence of "failure", also stops a release when a job was skipped or cancelled.
         # ref: https://github.com/actions/runner/issues/1251
-        if: ${{ github.event_name == 'push' && always() && !contains(join(needs.*.result, ','), 'failure') }}
+        if: ${{ github.event_name == 'push' && needs.lint.result == 'success' && needs.test.result == 'success' }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: "${{ env.GITHUB_TOKEN }}"
