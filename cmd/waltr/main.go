@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"github.com/adnoctem/gopskit/internal/waltr/app"
 	"github.com/adnoctem/gopskit/internal/waltr/cmd"
@@ -18,8 +18,18 @@ func main() {
 
 	cmdRoot := cmd.NewRootCommand(kern)
 	if err := cmdRoot.Execute(); err != nil {
-		kern.Log.Fatalf("command: '%s' resulted in error: %v\n", strings.Join(os.Args[1:2], " "), err)
+		kern.Log.Fatalf("command: '%s' resulted in error: %v\n", commandName(), err)
 	}
 
 	os.Exit(0)
+}
+
+// commandName is the subcommand the user ran, for error messages - the CLI's own name when none
+// was given.
+func commandName() string {
+	if len(os.Args) > 1 {
+		return os.Args[1]
+	}
+
+	return filepath.Base(os.Args[0])
 }
