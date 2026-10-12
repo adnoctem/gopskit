@@ -2,13 +2,16 @@ package helpers
 
 import (
 	"context"
+	"crypto/rand"
 	b64 "encoding/base64"
 	"fmt"
-	"math/rand/v2"
+	"math/big"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/Luzifer/go-dhparam"
-	"github.com/adnoctem/gopskit/pkg/proc"
 )
 
 const (
@@ -48,8 +51,22 @@ func GeneratePassphrase(opts ...PassphraseOpt) string {
 		o(cfg)
 	}
 
-	for i := 0; i < cfg.Length; i++ {
-		sb.WriteByte(cfg.CharSet[rand.IntN(len(cfg.CharSet))])
+	// characters, not bytes, so a charset with non-ASCII characters yields whole characters
+	chars := []rune(cfg.CharSet)
+	if len(chars) == 0 {
+		return ""
+	}
+
+	// crypto/rand: these passphrases encrypt volumes and CA keys. rand.Int draws uniformly, so
+	// no character is more likely than another.
+	limit := big.NewInt(int64(len(chars)))
+	for range cfg.Length {
+		n, err := rand.Int(rand.Reader, limit)
+		if err != nil {
+			// crypto/rand only fails when the operating system can't provide randomness at all
+			panic(fmt.Sprintf("helpers: no randomness available: %v", err))
+		}
+		sb.WriteRune(chars[n.Int64()])
 	}
 
 	return sb.String()
@@ -89,23 +106,23 @@ func DefaultDiffieHellmanConfig() *DiffieHellmanConfig {
 }
 
 func GenerateDiffieHellmanParams(opts ...DiffieHellmanOpt) (string, error) {
-	// var params string
 	cfg := DefaultDiffieHellmanConfig()
-	ctx, cancel := context.WithCancel(context.Background())
 
 	// (re-)configure
 	for _, o := range opts {
 		o(cfg)
 	}
 
-	// allow CTRL+C
-	go proc.AwaitCancel(func() int {
-		cancel()
-		return 0
-	})
+	// generation can take minutes, so CTRL+C cancels it - and only it: the handler ends with the
+	// generation, and an interruption is returned as an error rather than exiting successfully
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	raw, err := dhparam.GenerateWithContext(ctx, cfg.Bits, dhparam.GeneratorTwo, nil)
 	if err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("generating Diffie-Hellman parameters was interrupted: %w", ctx.Err())
+		}
 		return "", err
 	}
 

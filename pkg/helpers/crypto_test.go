@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -61,4 +62,15 @@ func TestGenerateDiffieHellmanParams(t *testing.T) {
 		_, err := GenerateDiffieHellmanParams(WithBits(64), WithEncoding(Encoding(99)))
 		asrt.Error(err)
 	})
+}
+
+func TestGeneratePassphraseKeepsMultibyteCharactersWhole(t *testing.T) {
+	p := GeneratePassphrase(WithLength(32), WithCharSet("äöü€"))
+
+	assert.True(t, utf8.ValidString(p), "a multibyte character must never be split")
+	assert.Equal(t, 32, utf8.RuneCountInString(p))
+}
+
+func TestGeneratePassphraseWithEmptyCharset(t *testing.T) {
+	assert.Empty(t, GeneratePassphrase(WithCharSet("")))
 }

@@ -11,10 +11,7 @@ go_library(
     ],
     importpath = "github.com/adnoctem/gopskit/pkg/helpers",
     visibility = ["//visibility:public"],
-    deps = [
-        "//pkg/proc",
-        "@com_github_luzifer_go_dhparam//:go-dhparam",
-    ],
+    deps = ["@com_github_luzifer_go_dhparam//:go-dhparam"],
 )
 
 alias(
