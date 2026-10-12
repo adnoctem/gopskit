@@ -111,6 +111,9 @@ For example, for Vaultwarden:
 				return err
 			}
 
+			if kf.url == "" {
+				return errors.New("the URL of Keycloak is required: set --url, $KEYCLOAK_URL or url in the configuration file")
+			}
 			if publicURL == "" {
 				publicURL = kf.url
 			}
@@ -162,10 +165,10 @@ For example, for Vaultwarden:
 	fs.StringSliceVarP(&out.outputs, "output", "o", []string{outputStdout},
 		"Where to write the settings: stdout, kubernetes, vault (repeatable)")
 	fs.StringVar(&out.format, "format", "env", "The stdout format: env or json")
-	fs.StringVar(&out.secretNamespace, "secret-namespace", "", "The namespace of the Secret --output kubernetes writes")
+	fs.StringVar(&out.secretNamespace, "secret-namespace", "", "The namespace of the Secret --output kubernetes writes (required for it)")
 	fs.StringVar(&out.secretName, "secret-name", "", "The name of that Secret (default: CLIENT_ID-oidc)")
-	fs.StringVar(&out.vaultAddr, "vault-addr", "", "Vault's address for --output vault")
-	fs.StringVar(&out.vaultToken, "vault-token", "", "A Vault token allowed to write --vault-path")
+	fs.StringVar(&out.vaultAddr, "vault-addr", "", "Vault's address (required for --output vault)")
+	fs.StringVar(&out.vaultToken, "vault-token", "", "A Vault token allowed to read and write --vault-path (required for --output vault)")
 	fs.StringVar(&out.vaultMount, "vault-mount", "kv", "The KV-v2 secrets engine's mount path")
 	fs.StringVar(&out.vaultPath, "vault-path", "", "The secret's path within the mount (default: CLIENT_ID/credentials/oidc)")
 	fs.StringSliceVar(&out.vaultCACerts, "vault-ca-cert", nil, "A PEM CA certificate to trust for Vault's TLS certificate (repeatable)")
@@ -371,7 +374,20 @@ func (o *clientOutput) writeVault(ctx context.Context, s *app.State, settings ma
 		return err
 	}
 
-	data := make(map[string]any, len(settings))
+	// like the Kubernetes output, keep the other keys an existing secret holds
+	data := map[string]any{}
+	existing, err := vc.KvV2Read(ctx, o.vaultMount, o.vaultPath)
+	switch {
+	case err == nil:
+		maps.Copy(data, existing)
+	case !apivault.IsNotFound(err):
+		return fmt.Errorf("could not read %s/%s: %w", o.vaultMount, o.vaultPath, err)
+	}
+
+	// a client turned public no longer has a secret; don't leave the old one behind
+	if _, ok := settings[keyClientSecret]; !ok {
+		delete(data, keyClientSecret)
+	}
 	for k, v := range settings {
 		data[k] = v
 	}

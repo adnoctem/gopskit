@@ -166,6 +166,11 @@ initialize:
 			"--vault-addr", vaultAddr, "--vault-token", vaulttest.RootToken, "--vault-mount", vaulttest.KVMount,
 		}, adminFlags(url)...)
 
+		// a key the application keeps at the same Vault path, which apply must leave alone
+		preexisting := rootClientFor(t, vaultAddr)
+		require.NoError(t, preexisting.KvV2Write(ctx, vaulttest.KVMount, "vaultwarden/credentials/oidc",
+			map[string]any{"admin-token": "keep-me"}))
+
 		stdout, err := run(t, s, args...)
 		require.NoError(t, err)
 
@@ -187,6 +192,7 @@ initialize:
 		require.NoError(t, err)
 		asrt.Equal(printed["client-secret"], stored["client-secret"])
 		asrt.Equal("vaultwarden", stored["client-id"])
+		asrt.Equal("keep-me", stored["admin-token"], "other keys at the path must survive")
 
 		again, err := run(t, s, args...)
 		require.NoError(t, err)
@@ -224,6 +230,23 @@ initialize:
 		require.NoError(t, err)
 		assert.False(t, exists, "a client must not be created when its secret has nowhere to go")
 	})
+}
+
+func rootClientFor(t *testing.T, addr string) *apivault.Client {
+	t.Helper()
+
+	vc := apivault.New(addr)
+	require.NoError(t, vc.SetToken(&apivault.Credentials{Token: vaulttest.RootToken}))
+
+	return vc
+}
+
+func TestClientApplyNeedsURL(t *testing.T) {
+	t.Setenv("KEYCLOAK_URL", "")
+	s, _ := newState(t)
+
+	_, err := run(t, s, "client", "apply", "x", "--redirect-uri", "https://x/cb")
+	assert.ErrorContains(t, err, "URL of Keycloak is required")
 }
 
 func TestShellQuote(t *testing.T) {
