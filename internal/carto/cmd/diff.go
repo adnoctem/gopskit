@@ -16,13 +16,13 @@ var _ app.CLIOpt = NewDiffCommand // assure type compatibility
 func NewDiffCommand(a *app.State) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              "diff <chart>",
-		Short:            "Show the semantic diff between the local chart render and the cluster",
+		Short:            "Show a line diff between the local chart render and the deployed release",
 		Long:             "Performs a client-only dry-run render of the chart and compares it against the currently deployed release manifest",
 		Args:             cobra.ExactArgs(1),
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			configPath := proc.Must(cmd.Flags().GetString("config"))
+			configPath := proc.Must(cmd.Flags().GetString("backbone"))
 			chartsDir := proc.Must(cmd.Flags().GetString("charts-dir"))
 			environment := proc.Must(cmd.Flags().GetString("environment"))
 
@@ -57,9 +57,12 @@ func NewDiffCommand(a *app.State) *cobra.Command {
 			}
 
 			current, err := hc.CurrentManifest(name)
-			if err != nil {
-				a.Log.Warnf("could not fetch current release manifest for %q (likely not installed yet): %v", name, err)
+			switch {
+			case apihelm.IsReleaseNotFound(err):
+				a.Log.Infof("%q is not installed yet; showing everything it would create", name)
 				current = ""
+			case err != nil:
+				return fmt.Errorf("could not fetch the current manifest of %q: %w", name, err)
 			}
 
 			d := apihelm.ManifestDiff(current, proposed)

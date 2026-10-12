@@ -31,7 +31,7 @@ func NewRollbackCommand(a *app.State) *cobra.Command {
 				return fmt.Errorf("invalid revision %q: %w", args[1], err)
 			}
 
-			configPath := proc.Must(cmd.Flags().GetString("config"))
+			configPath := proc.Must(cmd.Flags().GetString("backbone"))
 
 			cfg, err := config.Load(configPath)
 			if err != nil {

@@ -25,7 +25,7 @@ func NewRenderCommand(a *app.State) *cobra.Command {
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			configPath := proc.Must(cmd.Flags().GetString("config"))
+			configPath := proc.Must(cmd.Flags().GetString("backbone"))
 			chartsDir := proc.Must(cmd.Flags().GetString("charts-dir"))
 			environment := proc.Must(cmd.Flags().GetString("environment"))
 

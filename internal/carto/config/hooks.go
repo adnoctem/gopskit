@@ -28,14 +28,14 @@ func RunHooks(hooks []HookAction, exec *proc.Executor, kc *kube.Client, pod core
 			if logger != nil && len(out) > 0 && out[0] != "" {
 				logger.Debugf("hook %q output: %s", h.Local, strings.TrimSpace(out[0]))
 			}
-		case h.Exec != "":
-			stdout, stderr, err := kc.Exec(h.Exec, pod)
+		case len(h.Exec) > 0:
+			stdout, stderr, err := kc.ExecCommand(pod, h.Container, h.Exec)
 			if err != nil {
-				return fmt.Errorf("hook %q failed: %w (stderr: %s)", h.Exec, err, strings.TrimSpace(stderr))
+				return fmt.Errorf("hook %q failed: %w (stderr: %s)", h.Exec.String(), err, strings.TrimSpace(stderr))
 			}
 
 			if logger != nil && stdout != "" {
-				logger.Debugf("hook %q output: %s", h.Exec, strings.TrimSpace(stdout))
+				logger.Debugf("hook %q output: %s", h.Exec.String(), strings.TrimSpace(stdout))
 			}
 		}
 	}

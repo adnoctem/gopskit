@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "cmd",
@@ -18,6 +18,7 @@ go_library(
     deps = [
         "//internal/carto/app",
         "//internal/carto/config",
+        "//pkg/config",
         "//pkg/fsi",
         "//pkg/helm",
         "//pkg/proc",
@@ -33,4 +34,17 @@ alias(
     name = "go_default_library",
     actual = ":cmd",
     visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "cmd_test",
+    srcs = ["cmd_test.go"],
+    embed = [":cmd"],
+    deps = [
+        "//internal/carto/app",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+    ],
 )

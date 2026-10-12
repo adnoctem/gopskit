@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestGlobalValuesAppliesTo(t *testing.T) {
@@ -26,9 +28,9 @@ func TestHookActionValidate(t *testing.T) {
 	asrt := assert.New(t)
 
 	asrt.NoError(HookAction{Local: "script.sh"}.Validate())
-	asrt.NoError(HookAction{Exec: "echo hi"}.Validate())
+	asrt.NoError(HookAction{Exec: Command{"echo", "hi"}}.Validate())
 	asrt.Error(HookAction{}.Validate(), "neither set")
-	asrt.Error(HookAction{Local: "script.sh", Exec: "echo hi"}.Validate(), "both set")
+	asrt.Error(HookAction{Local: "script.sh", Exec: Command{"echo", "hi"}}.Validate(), "both set")
 }
 
 func TestConfigGlobalsFor(t *testing.T) {
@@ -127,4 +129,27 @@ charts:
 		_, err := Load(path)
 		asrt.Error(err)
 	})
+}
+
+func TestExecCommandForms(t *testing.T) {
+	asrt := assert.New(t)
+
+	var hooks struct {
+		Actions []HookAction `yaml:"actions"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(`
+actions:
+  - exec: vault operator raft list-peers && echo "done"
+  - exec: [/bin/vault, status, -format=json]
+    container: vault
+`), &hooks))
+
+	require.Len(t, hooks.Actions, 2)
+	asrt.Equal(Command{"/bin/sh", "-c", `vault operator raft list-peers && echo "done"`}, hooks.Actions[0].Exec,
+		"the string form runs in a shell, so quoting and && work")
+	asrt.Equal(Command{"/bin/vault", "status", "-format=json"}, hooks.Actions[1].Exec, "the list form runs as given")
+	asrt.Equal("vault", hooks.Actions[1].Container)
+
+	asrt.Error(HookAction{Local: "x.sh", Container: "vault"}.Validate(), "a container only makes sense with exec")
+	asrt.Error(yaml.Unmarshal([]byte("actions:\n  - exec: {cmd: x}\n"), &hooks), "a mapping is no command")
 }

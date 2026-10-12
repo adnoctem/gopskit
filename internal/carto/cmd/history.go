@@ -25,7 +25,7 @@ func NewHistoryCommand(a *app.State) *cobra.Command {
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			configPath := proc.Must(cmd.Flags().GetString("config"))
+			configPath := proc.Must(cmd.Flags().GetString("backbone"))
 
 			cfg, err := config.Load(configPath)
 			if err != nil {

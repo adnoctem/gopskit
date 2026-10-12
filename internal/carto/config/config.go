@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
 	"gopkg.in/yaml.v3"
@@ -37,16 +38,60 @@ type HookAction struct {
 	Local string `yaml:"local,omitempty"`
 
 	// Exec is a command to run inside the chart's release pod
-	Exec string `yaml:"exec,omitempty"`
+	Exec Command `yaml:"exec,omitempty"`
+
+	// Container is the release pod's container Exec runs in; its first container when empty
+	Container string `yaml:"container,omitempty"`
 }
 
 // Validate ensures the HookAction has exactly one of Local or Exec set
 func (h HookAction) Validate() error {
-	if (h.Local == "") == (h.Exec == "") {
-		return fmt.Errorf("hook action must set exactly one of 'local' or 'exec', got local=%q exec=%q", h.Local, h.Exec)
+	if (h.Local == "") == (len(h.Exec) == 0) {
+		return fmt.Errorf("hook action must set exactly one of 'local' or 'exec', got local=%q exec=%q", h.Local, h.Exec.String())
+	}
+
+	if h.Container != "" && len(h.Exec) == 0 {
+		return fmt.Errorf("hook action sets 'container' %q without 'exec'", h.Container)
 	}
 
 	return nil
+}
+
+// Command is a command run in a container. As in a Dockerfile, it is written either as a string,
+// which /bin/sh -c runs, so quoting, pipes and && work - or as a list, which runs as given, for
+// images without a shell.
+type Command []string
+
+// UnmarshalYAML accepts the string (shell) and list (exec) forms of a Command.
+func (c *Command) UnmarshalYAML(node *yaml.Node) error {
+	switch node.Kind {
+	case yaml.ScalarNode:
+		var s string
+		if err := node.Decode(&s); err != nil {
+			return err
+		}
+
+		*c = nil
+		if strings.TrimSpace(s) != "" {
+			*c = Command{"/bin/sh", "-c", s}
+		}
+		return nil
+	case yaml.SequenceNode:
+		var argv []string
+		if err := node.Decode(&argv); err != nil {
+			return err
+		}
+
+		*c = argv
+		return nil
+	default:
+		return fmt.Errorf("line %d: a command is a string or a list of strings", node.Line)
+	}
+}
+
+// String renders the command for messages.
+func (c Command) String() string {
+	return strings.Join(c, " ")
 }
 
 // Hook names recognized in a ChartConfig's Hooks map

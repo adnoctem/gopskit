@@ -29,7 +29,7 @@ func NewLogsCommand(a *app.State) *cobra.Command {
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			configPath := proc.Must(cmd.Flags().GetString("config"))
+			configPath := proc.Must(cmd.Flags().GetString("backbone"))
 
 			cfg, err := config.Load(configPath)
 			if err != nil {
@@ -41,7 +41,10 @@ func NewLogsCommand(a *app.State) *cobra.Command {
 				return err
 			}
 
-			pod, hasPod := releasePod(a, cc.Namespace, name)
+			pod, hasPod, err := releasePod(a, cc.Namespace, name)
+			if err != nil {
+				return err
+			}
 			if !hasPod {
 				return fmt.Errorf("could not find a release pod for chart %q in namespace %q", name, cc.Namespace)
 			}

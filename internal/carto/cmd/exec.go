@@ -25,7 +25,7 @@ func NewExecCommand(a *app.State) *cobra.Command {
 			name := args[0]
 			command := args[1:]
 
-			configPath := proc.Must(cmd.Flags().GetString("config"))
+			configPath := proc.Must(cmd.Flags().GetString("backbone"))
 
 			cfg, err := config.Load(configPath)
 			if err != nil {
@@ -37,7 +37,10 @@ func NewExecCommand(a *app.State) *cobra.Command {
 				return err
 			}
 
-			pod, hasPod := releasePod(a, cc.Namespace, name)
+			pod, hasPod, err := releasePod(a, cc.Namespace, name)
+			if err != nil {
+				return err
+			}
 			if !hasPod {
 				return fmt.Errorf("could not find a release pod for chart %q in namespace %q", name, cc.Namespace)
 			}

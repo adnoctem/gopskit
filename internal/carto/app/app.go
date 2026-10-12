@@ -1,13 +1,10 @@
 package app
 
 import (
-	"fmt"
-
 	apihelm "github.com/adnoctem/gopskit/pkg/helm"
 
 	"github.com/adnoctem/gopskit/pkg/core"
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
-	"github.com/adnoctem/gopskit/pkg/kube"
 	"github.com/adnoctem/gopskit/pkg/log"
 	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/adnoctem/gopskit/pkg/stamp"
@@ -51,18 +48,12 @@ func New(opts ...Opt) (*State, error) {
 		return nil, err
 	}
 
-	kc, err := kube.NewClient()
-	if err != nil {
-		return nil, fmt.Errorf("could not create kubernetes client: %v", err)
-	}
-
 	stamps := stamp.New()
 
 	a := &State{
 		API: &core.API{
 			Name:  Name,
 			Exec:  exec,
-			Kube:  kc,
 			Log:   lgr,
 			Paths: platf,
 			Stamp: stamps,
@@ -78,7 +69,12 @@ func New(opts ...Opt) (*State, error) {
 }
 
 // HelmClient creates a new Helm API client scoped to namespace, reusing the same
-// kubeconfig/REST client resolution as the rest of the application (via a.Kube.Flags).
+// kubeconfig/REST client resolution as the rest of the application (via the kube client's Flags).
 func (a *State) HelmClient(namespace string) (*apihelm.Client, error) {
-	return apihelm.New(namespace, apihelm.WithRESTClientGetter(a.Kube.Flags))
+	kc, err := a.KubeClient()
+	if err != nil {
+		return nil, err
+	}
+
+	return apihelm.New(namespace, apihelm.WithRESTClientGetter(kc.Flags))
 }

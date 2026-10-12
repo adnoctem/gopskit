@@ -1,13 +1,12 @@
 package helm
 
 import (
-	"errors"
+	"fmt"
 	"time"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/storage/driver"
 )
 
 // Apply installs or upgrades name to the given chart/values, mirroring `helm upgrade --install`.
@@ -19,13 +18,12 @@ import (
 // CLI command does it: check the release's history first, and install instead of upgrading if
 // it doesn't exist (or was previously uninstalled).
 func (c *Client) Apply(name string, ch *chart.Chart, vals map[string]interface{}) (*release.Release, error) {
-	hist := action.NewHistory(c.cfg)
-	hist.Max = 1
-	versions, err := hist.Run(name)
-	notInstalledYet := errors.Is(err, driver.ErrReleaseNotFound) ||
-		(err == nil && len(versions) > 0 && versions[len(versions)-1].Info.Status == release.StatusUninstalled)
+	installed, err := c.Installed(name)
+	if err != nil {
+		return nil, fmt.Errorf("could not determine whether %q is installed: %w", name, err)
+	}
 
-	if notInstalledYet {
+	if !installed {
 		install := action.NewInstall(c.cfg)
 		install.ReleaseName = name
 		install.Namespace = c.namespace

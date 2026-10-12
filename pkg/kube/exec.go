@@ -38,14 +38,26 @@ func (*DefaultRemoteExecutor) Execute(url *url.URL, restConfig *rest.Config, std
 	})
 }
 
-// Exec executes a command within the container of a specific Pod in the current namespace
-// configured for the client. If another namespace is required the ExecInNamespace helper
-// provides an escape hatch
+// Exec executes a command within the first container of a Pod. The command is split on white
+// space, without any shell quoting; ExecCommand takes the arguments as given and a container.
 func (c *Client) Exec(command string, pod corev1.Pod) (string, string, error) {
-	var err error
+	return c.ExecCommand(pod, "", strings.Fields(command))
+}
+
+// ExecCommand runs argv in the named container of a Pod - its first container when container is
+// empty - and returns what it wrote to stdout and stderr.
+func (c *Client) ExecCommand(pod corev1.Pod, container string, argv []string) (string, string, error) {
 	var stdOut, stdErr bytes.Buffer
 
-	args := strings.Fields(command)
+	if len(argv) == 0 {
+		return "", "", fmt.Errorf("no command to run in Pod %s/%s", pod.Namespace, pod.Name)
+	}
+
+	name, err := containerName(pod, container)
+	if err != nil {
+		return "", "", err
+	}
+
 	req := c.Client.CoreV1().
 		RESTClient().
 		Post().
@@ -54,8 +66,8 @@ func (c *Client) Exec(command string, pod corev1.Pod) (string, string, error) {
 		Namespace(pod.Namespace).
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
-			Container: pod.Spec.Containers[0].Name,
-			Command:   args,
+			Container: name,
+			Command:   argv,
 			Stdin:     false,
 			Stdout:    true,
 			Stderr:    true,
@@ -63,10 +75,30 @@ func (c *Client) Exec(command string, pod corev1.Pod) (string, string, error) {
 		}, scheme.ParameterCodec)
 
 	if err = c.Executor.Execute(req.URL(), c.Config, &stdOut, &stdErr); err != nil {
-		return "", "", fmt.Errorf("error in Kubernetes exec Stream: %v", err.Error())
+		return stdOut.String(), stdErr.String(), fmt.Errorf("error in Kubernetes exec Stream: %v", err.Error())
 	}
 
 	return stdOut.String(), stdErr.String(), nil
+}
+
+// containerName resolves container against pod: the Pod's first container when empty, and an
+// error when the Pod has no container of that name.
+func containerName(pod corev1.Pod, container string) (string, error) {
+	if len(pod.Spec.Containers) == 0 {
+		return "", fmt.Errorf("pod %s/%s has no containers", pod.Namespace, pod.Name)
+	}
+
+	if container == "" {
+		return pod.Spec.Containers[0].Name, nil
+	}
+
+	for _, c := range pod.Spec.Containers {
+		if c.Name == container {
+			return container, nil
+		}
+	}
+
+	return "", fmt.Errorf("pod %s/%s has no container %q", pod.Namespace, pod.Name, container)
 }
 
 // fixedSizeQueue reports a single, unchanging terminal size and then stops - it does not track

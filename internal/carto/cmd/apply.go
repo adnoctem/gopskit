@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/adnoctem/gopskit/internal/carto/app"
 	"github.com/adnoctem/gopskit/internal/carto/config"
@@ -23,7 +24,7 @@ func NewApplyCommand(a *app.State) *cobra.Command {
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			configPath := proc.Must(cmd.Flags().GetString("config"))
+			configPath := proc.Must(cmd.Flags().GetString("backbone"))
 			chartsDir := proc.Must(cmd.Flags().GetString("charts-dir"))
 			environment := proc.Must(cmd.Flags().GetString("environment"))
 
@@ -52,10 +53,16 @@ func NewApplyCommand(a *app.State) *cobra.Command {
 				return err
 			}
 
-			history, _ := hc.History(name, 1)
-			firstInstall := len(history) == 0
+			installed, err := hc.Installed(name)
+			if err != nil {
+				return fmt.Errorf("could not determine whether %q is installed: %w", name, err)
+			}
+			firstInstall := !installed
 
-			pod, hasPod := releasePod(a, cc.Namespace, name)
+			pod, hasPod, err := releasePod(a, cc.Namespace, name)
+			if err != nil {
+				return err
+			}
 
 			if err := runHookSet(cc, config.HookPreApply, a, pod, hasPod); err != nil {
 				return fmt.Errorf("pre-apply hooks failed: %w", err)
@@ -69,13 +76,17 @@ func NewApplyCommand(a *app.State) *cobra.Command {
 
 			if firstInstall {
 				// the pod may not have existed yet when we looked it up above
-				pod, hasPod = releasePod(a, cc.Namespace, name)
+				if pod, hasPod, err = releasePod(a, cc.Namespace, name); err != nil {
+					return err
+				}
 				if err := runHookSet(cc, config.HookFirstInstall, a, pod, hasPod); err != nil {
 					return fmt.Errorf("first-install hooks failed: %w", err)
 				}
 			}
 
-			pod, hasPod = releasePod(a, cc.Namespace, name)
+			if pod, hasPod, err = releasePod(a, cc.Namespace, name); err != nil {
+				return err
+			}
 			if err := runHookSet(cc, config.HookPostApply, a, pod, hasPod); err != nil {
 				return fmt.Errorf("post-apply hooks failed: %w", err)
 			}
@@ -87,18 +98,53 @@ func NewApplyCommand(a *app.State) *cobra.Command {
 	return cmd
 }
 
-// releasePod finds a pod belonging to name's release, for use by "exec" hooks. It returns
-// hasPod=false if none could be found (e.g. before first install) rather than erroring, since
-// hook sets without an "exec" action don't need a pod at all.
-func releasePod(a *app.State, namespace, name string) (corev1.Pod, bool) {
-	pods, err := a.Kube.Pods(namespace, metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("app.kubernetes.io/instance=%s", name),
-	})
-	if err != nil || len(pods) == 0 {
-		return corev1.Pod{}, false
+// releasePod finds a running pod belonging to name's release, for "exec" hooks and the exec and
+// logs commands - preferring a ready one, and never one that is shutting down. It returns
+// hasPod=false if there is none (e.g. before first install) rather than erroring, since hook sets
+// without an "exec" action don't need a pod at all.
+func releasePod(a *app.State, namespace, name string) (corev1.Pod, bool, error) {
+	kc, err := a.KubeClient()
+	if err != nil {
+		return corev1.Pod{}, false, err
 	}
 
-	return pods[0], true
+	pods, err := kc.Pods(namespace, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("app.kubernetes.io/instance=%s", name),
+	})
+	if err != nil {
+		return corev1.Pod{}, false, fmt.Errorf("could not list the pods of release %q: %w", name, err)
+	}
+
+	pod, ok := pickPod(pods)
+	return pod, ok, nil
+}
+
+// pickPod chooses the pod to work with: a ready one if there is any, else a running one, and
+// never one being deleted. Ties go to the alphabetically first name, so the choice is stable.
+func pickPod(pods []corev1.Pod) (corev1.Pod, bool) {
+	var ready, running []corev1.Pod
+	for _, p := range pods {
+		if p.DeletionTimestamp != nil || p.Status.Phase != corev1.PodRunning {
+			continue
+		}
+
+		running = append(running, p)
+		for _, c := range p.Status.Conditions {
+			if c.Type == corev1.PodReady && c.Status == corev1.ConditionTrue {
+				ready = append(ready, p)
+				break
+			}
+		}
+	}
+
+	for _, candidates := range [][]corev1.Pod{ready, running} {
+		if len(candidates) > 0 {
+			sort.Slice(candidates, func(i, j int) bool { return candidates[i].Name < candidates[j].Name })
+			return candidates[0], true
+		}
+	}
+
+	return corev1.Pod{}, false
 }
 
 // runHookSet runs the named hook's actions from cc, if any are declared
@@ -109,10 +155,15 @@ func runHookSet(cc config.ChartConfig, hook string, a *app.State, pod corev1.Pod
 	}
 
 	for _, action := range actions {
-		if action.Exec != "" && !hasPod {
+		if len(action.Exec) > 0 && !hasPod {
 			return fmt.Errorf("hook %q needs an 'exec' action but no release pod was found", hook)
 		}
 	}
 
-	return config.RunHooks(actions, a.Exec, a.Kube, pod, a.Log)
+	kc, err := a.KubeClient()
+	if err != nil {
+		return err
+	}
+
+	return config.RunHooks(actions, a.Exec, kc, pod, a.Log)
 }

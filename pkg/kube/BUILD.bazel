@@ -49,6 +49,7 @@ go_test(
     name = "kube_test",
     srcs = [
         "apply_test.go",
+        "exec_container_test.go",
         "generic_test.go",
         "kube_test.go",
         "kubeconfig_test.go",
