@@ -1,3 +1,25 @@
+## [1.2.0](https://github.com/adnoctem/gopskit/compare/v1.1.2...v1.2.0) (2026-10-12)
+
+### Features
+
+* **bridge:** add gopskit-bridge SOCKS5 server ([92f8b00](https://github.com/adnoctem/gopskit/commit/92f8b00103c5b28d7daea1d2ab62ec32f9128ae7))
+* **bridge:** add proxy setup, check and cleanup commands ([28da46c](https://github.com/adnoctem/gopskit/commit/28da46c7b2f53b47ff26aa674b498cfb2c16ea8f))
+* **bridge:** build and publish the gopskit-bridge image ([2814977](https://github.com/adnoctem/gopskit/commit/2814977c380090cdac90fca3ac72f088c0925f46))
+* **pkg/api/vault:** add WithTransport option ([05a24c5](https://github.com/adnoctem/gopskit/commit/05a24c5781203976ae627699fa13db58dd021405))
+* **pkg/config:** add configuration files mirroring CLI flags ([701da82](https://github.com/adnoctem/gopskit/commit/701da8232acb82e6a6f091b009e0fa77c2a84b9b))
+* **pkg/log:** add WithOutputPaths option ([d269054](https://github.com/adnoctem/gopskit/commit/d26905440f3553345ae22db19a3141b3b4dd9df6))
+
+### Bug Fixes
+
+* **bridge:** answer slow dials instead of hanging up ([59addc2](https://github.com/adnoctem/gopskit/commit/59addc26f0d8cfd01648a73c6fb0e43efa6d8450))
+* **build:** stamp the release version into binaries ([75e8202](https://github.com/adnoctem/gopskit/commit/75e8202f37e109bcdeb36f873c2fc36a2404964e))
+* **pkg/api/keycloak:** keep login settings when loading persisted tokens ([8d4d901](https://github.com/adnoctem/gopskit/commit/8d4d901517340969fe128b907a9bae299db563cf))
+* **pkg/kube:** stop racing on port-forward output buffers ([b65db23](https://github.com/adnoctem/gopskit/commit/b65db234f1b21f207264d5e7e4daa23e4a574e9b))
+* **ssolo:** create OIDC clients and reach Keycloak by URL ([e1e29d5](https://github.com/adnoctem/gopskit/commit/e1e29d5dc5b9be3674f331ada1ef8357a3e86c98))
+* **ssolo:** read settings from a configuration file ([c66fbdd](https://github.com/adnoctem/gopskit/commit/c66fbdd652a3c08166d17e9da9f82eb100d8be37))
+* **ssolo:** reject an unparseable --vault-ca-cert up front ([dc913a3](https://github.com/adnoctem/gopskit/commit/dc913a35b492c3e88a96359ea43a784eb6fcd057))
+* **waltr:** reach Vault by address and read settings from a config file ([a40c4f5](https://github.com/adnoctem/gopskit/commit/a40c4f50d38d37c8be34e122cdcd8a48213b1d21))
+
 ## [1.1.2](https://github.com/adnoctem/gopskit/compare/v1.1.1...v1.1.2) (2026-09-05)
 
 ### Bug Fixes
