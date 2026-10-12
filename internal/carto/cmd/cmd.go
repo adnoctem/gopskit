@@ -57,7 +57,7 @@ func NewRootCommand(carto *app.State) *cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&backbone, "backbone", "b", app.DefaultBackboneFile, "Path to the backbone.yaml declaring the charts")
 	cmd.PersistentFlags().StringVar(&chartsDir, "charts-dir", DefaultChartsDir, "Directory containing per-chart values.yaml/values.<environment>.yaml files")
-	cmd.PersistentFlags().StringVarP(&environment, "environment", "e", "dev", "The execution environment to use (dev, stage, prod)")
+	cmd.PersistentFlags().StringVarP(&environment, "environment", "e", "dev", "The environment, which selects each chart's values.<environment>.yaml overlay")
 
 	config.AddFlag(cmd, app.Name)
 	carto.AddKubeFlags(cmd)

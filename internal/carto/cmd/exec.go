@@ -53,7 +53,7 @@ func NewExecCommand(a *app.State) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&container, "container", "C", "", "Container name (defaults to the pod's only container)")
+	cmd.Flags().StringVarP(&container, "container", "C", "", "Container name (defaults to the pod's first container)")
 
 	return cmd
 }
