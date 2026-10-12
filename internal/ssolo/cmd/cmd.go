@@ -49,6 +49,7 @@ for cluster-internal addresses such as https://keycloak.keycloak.svc:8443 - see 
 	}
 
 	config.AddFlag(cmd, app.Name)
+	ssolo.AddKubeFlags(cmd)
 
 	// add subcommands
 	for _, opt := range Commands {

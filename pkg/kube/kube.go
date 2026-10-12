@@ -1,10 +1,9 @@
 package kube
 
 import (
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
 
@@ -20,7 +19,7 @@ const (
 )
 
 type Client struct {
-	// ConfigPath is the configuration file path for which the current client(-set) was created
+	// ConfigPath is an explicitly chosen kubeconfig file; empty means it's found as kubectl finds it
 	ConfigPath string
 
 	// Executor is the connection between local and remote IO streams
@@ -28,6 +27,9 @@ type Client struct {
 
 	// Namespace is the Kubernetes namespace the client is configured to access
 	namespace string
+
+	// context is the kubeconfig context to use instead of the current one
+	context string
 
 	// Config is the rest.Config for which the client was built
 	Config *rest.Config
@@ -48,7 +50,12 @@ type Client struct {
 // Opt represents a configuration option for the KubeClient
 type Opt func(c *Client)
 
-// NewClient instantiates a new KubeClient with a configured and embedded Clientset
+// NewClient instantiates a new KubeClient with a configured and embedded Clientset.
+//
+// The kubeconfig is found the way kubectl finds it: the file WithConfigPath names, or else the
+// files in $KUBECONFIG, or else ~/.kube/config - falling back to $UserConfigDir/gopskit/kubeconfig
+// and finally to the in-cluster configuration when running in a Pod. WithContext selects a context
+// other than the current one.
 func NewClient(opts ...Opt) (*Client, error) {
 	var err error
 
@@ -60,29 +67,43 @@ func NewClient(opts ...Opt) (*Client, error) {
 		opt(kc)
 	}
 
-	// if WithConfigPath wasn't in the opts
-	if kc.ConfigPath == "" {
-		kc.ConfigPath, err = findKubeConfig()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	if kc.namespace == "" {
 		kc.namespace = DefaultNamespace
 	}
 
-	// keep Flags (used by consumers needing a genericclioptions.RESTClientGetter, e.g. the Helm
-	// SDK) resolving against the same kubeconfig/namespace as Config/Client above, instead of
-	// independently re-discovering its own defaults
-	kc.Flags = genericclioptions.NewConfigFlags(true)
-	kc.Flags.KubeConfig = &kc.ConfigPath
-	kc.Flags.Namespace = &kc.namespace
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	switch {
+	case kc.ConfigPath != "":
+		rules.ExplicitPath = kc.ConfigPath
+	case os.Getenv(clientcmd.RecommendedConfigPathEnvVar) == "":
+		// client-go fixes ~/.kube/config when the process starts; resolve it now instead
+		if home, err := os.UserHomeDir(); err == nil {
+			homeFile := filepath.Join(home, clientcmd.RecommendedHomeDir, clientcmd.RecommendedFileName)
+			rules.Precedence = []string{homeFile}
 
-	kc.Config, err = clientcmd.BuildConfigFromFlags("", kc.ConfigPath)
-	if err != nil {
-		return nil, err
+			if fallback := gopskitKubeConfig(); fallback != "" && !fs.CheckIfExists(homeFile) {
+				rules.ExplicitPath = fallback
+			}
+		}
 	}
+
+	overrides := &clientcmd.ConfigOverrides{CurrentContext: kc.context}
+	kc.Config, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("could not load a kubeconfig (set $KUBECONFIG or --kubeconfig): %w", err)
+	}
+
+	// keep Flags (used by consumers needing a genericclioptions.RESTClientGetter, e.g. the Helm
+	// SDK) resolving against the same kubeconfig, context and namespace as Config/Client above,
+	// instead of independently re-discovering its own defaults
+	kc.Flags = genericclioptions.NewConfigFlags(true)
+	if rules.ExplicitPath != "" {
+		kc.Flags.KubeConfig = &rules.ExplicitPath
+	}
+	if kc.context != "" {
+		kc.Flags.Context = &kc.context
+	}
+	kc.Flags.Namespace = &kc.namespace
 
 	kc.Client, err = kubernetes.NewForConfig(kc.Config)
 	if err != nil {
@@ -97,11 +118,18 @@ func NewClient(opts ...Opt) (*Client, error) {
 	return kc, nil
 }
 
-// WithConfigPath configures the KubeClient with a predetermined path for the 'kubeconfig' file
-// This avoids the usual searches done within findKubeConfig
+// WithConfigPath configures the KubeClient with a predetermined path for the 'kubeconfig' file,
+// which takes precedence over $KUBECONFIG and the default locations
 func WithConfigPath(path string) func(c *Client) {
 	return func(c *Client) {
 		c.ConfigPath = path
+	}
+}
+
+// WithContext selects a kubeconfig context other than the current one
+func WithContext(context string) func(c *Client) {
+	return func(c *Client) {
+		c.context = context
 	}
 }
 
@@ -112,36 +140,18 @@ func WithNamespace(namespace string) func(c *Client) {
 	}
 }
 
-// TODO(MVProwess): evaluate validation of the found file path
-//
-// findKubeConfig searches the filesystem for possible locations of a KubeConfig file, which is most commonly
-// located at "$HOME/.kube/config". In addition to the aforementioned path we add "$HOME/.config/gopskit/kubeconfig" as
-// another possible location for the configuration file
-//
-// The function returns the first path which exists and (for now) does zero checking if we're actually looking at a
-// possibly valid file
-func findKubeConfig() (string, error) {
-	home, err := os.UserHomeDir()
+// gopskitKubeConfig is the gopskit-specific kubeconfig location, $UserConfigDir/gopskit/kubeconfig,
+// or "" if it doesn't exist.
+func gopskitKubeConfig() string {
+	dir, err := os.UserConfigDir()
 	if err != nil {
-		return "", err
+		return ""
 	}
 
-	config, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
+	path := filepath.Join(dir, "gopskit", "kubeconfig")
+	if !fs.CheckIfExists(path) {
+		return ""
 	}
 
-	paths := make([]string, 0)
-	paths = append(paths, filepath.Join(home, ".kube", "config"), filepath.Join(config, "gopskit", "kubeconfig"))
-
-	for _, path := range paths {
-		exists := fs.CheckIfExists(path)
-		if exists {
-			return path, nil
-		} else {
-			continue
-		}
-	}
-
-	return "", errors.New("couldn't find Kubeconfig file at known paths: [" + strings.Join(paths, ", ") + "]")
+	return path
 }

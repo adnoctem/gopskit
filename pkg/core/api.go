@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/spf13/cobra"
+
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
 	"github.com/adnoctem/gopskit/pkg/kube"
 	"github.com/adnoctem/gopskit/pkg/log"
@@ -44,8 +46,22 @@ type API struct {
 	// on the 'go_library' rule
 	Stamp *stamp.Stamps
 
+	// KubeConfig and KubeContext select the kubeconfig file and context KubeClient uses; empty
+	// means kubectl's defaults ($KUBECONFIG, ~/.kube/config, the current context)
+	KubeConfig  string
+	KubeContext string
+
 	kubeOnce sync.Once
 	kubeErr  error
+}
+
+// AddKubeFlags registers --kubeconfig and --context on cmd, normally the root command, for
+// KubeClient to use.
+func (a *API) AddKubeFlags(cmd *cobra.Command) {
+	cmd.PersistentFlags().StringVar(&a.KubeConfig, "kubeconfig", "",
+		"The kubeconfig file to use (default: $KUBECONFIG, then ~/.kube/config)")
+	cmd.PersistentFlags().StringVar(&a.KubeContext, "context", "",
+		"The kubeconfig context to use (default: the current context)")
 }
 
 // KubeClient returns Kube, creating it on first use from the same sources as `kubectl`. Creating
@@ -57,7 +73,15 @@ func (a *API) KubeClient() (*kube.Client, error) {
 			return
 		}
 
-		a.Kube, a.kubeErr = kube.NewClient()
+		var opts []kube.Opt
+		if a.KubeConfig != "" {
+			opts = append(opts, kube.WithConfigPath(a.KubeConfig))
+		}
+		if a.KubeContext != "" {
+			opts = append(opts, kube.WithContext(a.KubeContext))
+		}
+
+		a.Kube, a.kubeErr = kube.NewClient(opts...)
 		if a.kubeErr != nil {
 			a.kubeErr = fmt.Errorf("could not create kubernetes client: %w", a.kubeErr)
 		}

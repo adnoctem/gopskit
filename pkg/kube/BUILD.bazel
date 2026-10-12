@@ -51,10 +51,12 @@ go_test(
         "apply_test.go",
         "generic_test.go",
         "kube_test.go",
+        "kubeconfig_test.go",
     ],
     embed = [":kube"],
     deps = [
         "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
         "@io_k8s_api//apps/v1:apps",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_api//networking/v1:networking",

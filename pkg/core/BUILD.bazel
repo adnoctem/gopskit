@@ -27,12 +27,20 @@ go_library(
         "//pkg/log",
         "//pkg/proc",
         "//pkg/stamp",
+        "@com_github_spf13_cobra//:cobra",
     ],
 )
 
 go_test(
     name = "core_test",
-    srcs = ["env_test.go"],
+    srcs = [
+        "env_test.go",
+        "kube_test.go",
+    ],
     embed = [":core"],
-    deps = ["@com_github_stretchr_testify//assert"],
+    deps = [
+        "@com_github_spf13_cobra//:cobra",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
 )

@@ -68,6 +68,7 @@ func NewRootCommand(waltr *app.State) *cobra.Command {
 	cmd.PersistentFlags().StringVar(&waltr.CredentialFile, "credential-file", "",
 		"Where 'waltr init' stores the root token and keys, and other commands read them (default: per --environment in the cache directory)")
 	config.AddFlag(cmd, app.Name)
+	waltr.AddKubeFlags(cmd)
 
 	// add subcommands
 	for _, opt := range Commands {
