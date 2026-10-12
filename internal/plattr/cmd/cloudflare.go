@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/adnoctem/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/pkg/config"
 	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -17,6 +17,7 @@ func NewCloudflareCommand(app *app.State) *cobra.Command {
 	var (
 		token             string
 		reflectNamespaces []string
+		overwrite         bool
 	)
 
 	cmd := &cobra.Command{
@@ -25,23 +26,11 @@ func NewCloudflareCommand(app *app.State) *cobra.Command {
 		Long:             "Configure Cloudflare API credentials via Kubernetes Secrets",
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var annotations = make(map[string]string)
-			var exists = true
-
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
 
 			if token == "" {
 				return errors.New("cannot create Cloudflare Secret without credentials")
-			}
-
-			if reflect {
-				annotations = map[string]string{
-					"reflector.v1.k8s.emberstack.com/reflection-allowed":            "true",
-					"reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": strings.Join(reflectNamespaces, ","),
-					"reflector.v1.k8s.emberstack.com/reflection-auto-enabled":       "true",
-					"reflector.v1.k8s.emberstack.com/reflection-auto-namespaces":    strings.Join(reflectNamespaces, ","),
-				}
 			}
 
 			secret := &corev1.Secret{
@@ -52,7 +41,7 @@ func NewCloudflareCommand(app *app.State) *cobra.Command {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "cloudflare-api-credentials",
 					Namespace:   namespace,
-					Annotations: annotations,
+					Annotations: reflectorAnnotations(reflect, reflectNamespaces),
 				},
 				Type: "Opaque",
 				Data: map[string][]byte{
@@ -60,27 +49,13 @@ func NewCloudflareCommand(app *app.State) *cobra.Command {
 				},
 			}
 
-			_, err := app.Kube.Secret(secret.Namespace, secret.Name, metav1.GetOptions{})
-			if err != nil {
-				exists = false
-			}
-
-			if exists {
-				app.Log.Infof("Skipping creation of Cloudflare credentials secret in namespace: %s. Secret exists: %s",
-					secret.Namespace,
-					secret.Name)
-				return nil
-			}
-
-			if err := app.Kube.CreateSecret(secret.Namespace, secret, metav1.CreateOptions{}); err != nil {
-				return err
-			}
-			app.Log.Infof("Successfully created secret: %s in namespace: %s", secret.Name, secret.Namespace)
-			return nil
+			return applySecret(cmd.Context(), app, secret, overwrite, "Cloudflare API credentials")
 		},
 	}
 
 	cmd.PersistentFlags().StringVar(&token, "token", "", "Cloudflare API token")
+	cmd.PersistentFlags().BoolVar(&overwrite, "overwrite", false, "Replace an existing Secret, e.g. to rotate the token")
+	config.BindEnv(cmd.PersistentFlags(), "token", "CLOUDFLARE_API_TOKEN")
 	cmd.PersistentFlags().StringArrayVar(&reflectNamespaces, "reflect-namespaces", []string{
 		"kube-system",
 		"cert-manager",

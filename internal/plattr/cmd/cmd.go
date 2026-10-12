@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/adnoctem/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,10 @@ var (
 )
 
 func NewRootCommand(plattr *app.State) *cobra.Command {
+	// run every persistent pre-run hook from the root down, so the configuration file still
+	// loads under subcommands with hooks of their own
+	cobra.EnableTraverseRunHooks = true
+
 	var (
 		namespace string
 		reflect   bool
@@ -45,6 +50,11 @@ func NewRootCommand(plattr *app.State) *cobra.Command {
 
 			return nil
 		},
+		// every flag can also come from the environment (where bound) or plattr.yaml; commands that
+		// need the cluster create its client themselves
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			return config.Load(app.Name, cmd)
+		},
 		CompletionOptions: cobra.CompletionOptions{
 			HiddenDefaultCmd: true,
 		},
@@ -53,6 +63,9 @@ func NewRootCommand(plattr *app.State) *cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&namespace, "namespace", "n", app.DefaultNamespace, "The Kubernetes namespace to use. None equates to checking the entire cluster.")
 	cmd.PersistentFlags().BoolVar(&reflect, "reflect", false, "Enable reflection for the created resources via Reflector.")
+
+	config.AddFlag(cmd, app.Name)
+	plattr.AddKubeFlags(cmd)
 
 	// add subcommands
 	for _, opt := range Commands {

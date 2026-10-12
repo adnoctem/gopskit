@@ -1,15 +1,12 @@
 package app
 
 import (
-	"fmt"
-
 	"github.com/adnoctem/gopskit/pkg/core"
 	fs "github.com/adnoctem/gopskit/pkg/fsi"
 	"github.com/adnoctem/gopskit/pkg/log"
 	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
 
-	"github.com/adnoctem/gopskit/pkg/kube"
 	"github.com/adnoctem/gopskit/pkg/stamp"
 )
 
@@ -50,18 +47,12 @@ func New(opts ...Opt) (*State, error) {
 		return nil, err
 	}
 
-	kc, err := kube.NewClient()
-	if err != nil {
-		return nil, fmt.Errorf("could not create kubernetes client: %v", err)
-	}
-
 	stamps := stamp.New()
 
 	a := &State{
 		API: &core.API{
 			Name:  Name,
 			Exec:  exec,
-			Kube:  kc,
 			Log:   lgr,
 			Paths: platf,
 			Stamp: stamps,

@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/adnoctem/gopskit/internal/plattr/app"
+	"github.com/adnoctem/gopskit/pkg/config"
 	"github.com/adnoctem/gopskit/pkg/helpers"
 	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
@@ -30,8 +30,6 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 		Long:             "Configure Hetzner Volume Encryption via Kubernetes Secrets",
 		TraverseChildren: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var annotations = make(map[string]string)
-			var secretExists, storageClassExists = true, true // assume true to avoid creations
 
 			namespace := proc.Must(cmd.Flags().GetString("namespace"))
 			reflect := proc.Must(cmd.Flags().GetBool("reflect"))
@@ -47,15 +45,6 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 				return errors.New("cannot create Hetzner Volume Encryption Secret without passphrase")
 			}
 
-			if reflect {
-				annotations = map[string]string{
-					"reflector.v1.k8s.emberstack.com/reflection-allowed":            "true",
-					"reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": strings.Join(reflectNamespaces, ","),
-					"reflector.v1.k8s.emberstack.com/reflection-auto-enabled":       "true",
-					"reflector.v1.k8s.emberstack.com/reflection-auto-namespaces":    strings.Join(reflectNamespaces, ","),
-				}
-			}
-
 			secret := &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "v1",
@@ -64,7 +53,7 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "hetzner-volume-encryption",
 					Namespace:   namespace,
-					Annotations: annotations,
+					Annotations: reflectorAnnotations(reflect, reflectNamespaces),
 				},
 				Type: "Opaque",
 				StringData: map[string]string{
@@ -90,45 +79,18 @@ func NewHetznerEncryptionCommand(app *app.State) *cobra.Command {
 				},
 			}
 
-			// create secret (or skip) - independent of the storage class below, so a missing
-			// secret is always created even if the storage class already exists (and vice versa)
-			_, err := app.Kube.Secret(secret.Namespace, secret.Name, metav1.GetOptions{})
-			if err != nil {
-				secretExists = false
-			}
-
-			if secretExists {
-				app.Log.Infof("Skipping creation of Hetzner Volume Encryption Secret in namespace: %s. Secret exists: %s",
-					secret.Namespace,
-					secret.Name)
-			} else {
-				if err := app.Kube.CreateSecret(secret.Namespace, secret, metav1.CreateOptions{}); err != nil {
-					return err
-				}
-				app.Log.Infof("Successfully created Hetzner Volume Encryption Secret: %s in namespace: %s", secret.Name, secret.Namespace)
-			}
-
-			// create storage-class (or skip)
-			_, err = app.Kube.StorageClass(storageClass.Name, metav1.GetOptions{})
-			if err != nil {
-				storageClassExists = false
-			}
-
-			if storageClassExists {
-				app.Log.Infof("Skipping creation of Hetzner Volume Encryption StorageClass: %s. StorageClass exists.",
-					storageClass.Name)
-				return nil
-			}
-
-			if err := app.Kube.CreateStorageClass(storageClass, metav1.CreateOptions{}); err != nil {
+			// the Secret is never replaced: volumes encrypted with the old passphrase could no longer
+			// be unlocked with a new one
+			if err := applySecret(cmd.Context(), app, secret, false, "Hetzner Volume Encryption"); err != nil {
 				return err
 			}
-			app.Log.Infof("Successfully created Hetzner Volume Encryption StorageClass: %s", storageClass.Name)
-			return nil
+
+			return ensureStorageClass(cmd.Context(), app, storageClass, "Hetzner Volume Encryption")
 		},
 	}
 
 	cmd.PersistentFlags().StringVar(&passphrase, "passphrase", "", "The encryption passphrase")
+	config.BindEnv(cmd.PersistentFlags(), "passphrase", "PLATTR_ENCRYPTION_PASSPHRASE")
 	cmd.PersistentFlags().BoolVar(&generatePassphrase, "generate-passphrase", false, "Generate an encryption passphrase")
 	cmd.PersistentFlags().StringVar(&passphraseCharset, "passphrase-charset", helpers.PassphraseDefaultCharset, "The charset for the (generated) passphrase")
 	cmd.PersistentFlags().IntVar(&passphraseLength, "passphrase-length", helpers.PassphraseDefaultLength, "The length for the (generated) passphrase")

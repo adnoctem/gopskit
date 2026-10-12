@@ -8,7 +8,6 @@ go_library(
     deps = [
         "//pkg/core",
         "//pkg/fsi",
-        "//pkg/kube",
         "//pkg/log",
         "//pkg/proc",
         "//pkg/stamp",

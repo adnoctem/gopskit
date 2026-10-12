@@ -13,11 +13,13 @@ go_library(
         "hetzner.go",
         "longhorn.go",
         "nginx.go",
+        "resources.go",
     ],
     importpath = "github.com/adnoctem/gopskit/internal/plattr/cmd",
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/plattr/app",
+        "//pkg/config",
         "//pkg/helpers",
         "//pkg/proc",
         "//pkg/tools",
@@ -25,6 +27,7 @@ go_library(
         "@in_gopkg_yaml_v3//:yaml_v3",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_api//storage/v1:storage",
+        "@io_k8s_apimachinery//pkg/api/errors",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
     ],
 )
@@ -40,6 +43,7 @@ go_test(
     srcs = [
         "hetzner_test.go",
         "longhorn_test.go",
+        "secrets_test.go",
     ],
     embed = [":cmd"],
     deps = [
@@ -48,8 +52,11 @@ go_test(
         "//pkg/kube",
         "//pkg/log",
         "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/runtime",
         "@io_k8s_client_go//kubernetes/fake",
+        "@io_k8s_client_go//testing",
     ],
 )
