@@ -222,3 +222,84 @@ func TestNoFileIsFine(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, path)
 }
+
+type testDocument struct {
+	Policies map[string]string `yaml:"policies"`
+	Roles    []struct {
+		Name string `yaml:"name"`
+	} `yaml:"roles"`
+}
+
+// newDocumentTree is newTree with a "state" document registered and loaded by the root.
+func newDocumentTree(t *testing.T) (*cobra.Command, *captured) {
+	t.Helper()
+
+	root, got := newTree(t)
+	AddDocument(root, "state")
+
+	return root, got
+}
+
+func TestDocumentSections(t *testing.T) {
+	asrt := assert.New(t)
+
+	path := writeConfig(t, `
+url: https://from-file
+state:
+  policies:
+    admin: path "*" {}
+  roles:
+    - name: app
+client:
+  apply:
+    uri: https://app/cb
+`)
+
+	root, got := newDocumentTree(t)
+	require.NoError(t, execute(t, root, "client", "apply", "--config", path))
+	asrt.Equal("https://from-file", got.url, "the flag settings next to a document still apply")
+
+	var doc testDocument
+	present, err := Section(root, "state", &doc)
+	require.NoError(t, err)
+	asrt.True(present)
+	asrt.Equal(`path "*" {}`, doc.Policies["admin"])
+	require.Len(t, doc.Roles, 1)
+	asrt.Equal("app", doc.Roles[0].Name)
+}
+
+func TestDocumentsAreStrict(t *testing.T) {
+	path := writeConfig(t, `
+state:
+  policies:
+    admin: x
+  rolls:
+    - name: app
+`)
+
+	root, _ := newDocumentTree(t)
+	require.NoError(t, execute(t, root, "client", "apply", "--config", path, "--uri", "x"))
+
+	var doc testDocument
+	_, err := Section(root, "state", &doc)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "rolls", "a misspelled key must be an error")
+	assert.Contains(t, err.Error(), "line 5", "with the line number of the file itself")
+}
+
+func TestMissingDocument(t *testing.T) {
+	root, _ := newDocumentTree(t)
+	require.NoError(t, execute(t, root, "client", "apply", "--config", writeConfig(t, "url: x\n"), "--uri", "x"))
+
+	var doc testDocument
+	present, err := Section(root, "state", &doc)
+	require.NoError(t, err)
+	assert.False(t, present)
+}
+
+func TestUnregisteredDocumentIsAnError(t *testing.T) {
+	root, _ := newTree(t)
+
+	err := execute(t, root, "client", "apply", "--config", writeConfig(t, "state:\n  policies: {}\n"), "--uri", "x")
+	assert.Error(t, err, "without AddDocument, a mapping must name a subcommand")
+}

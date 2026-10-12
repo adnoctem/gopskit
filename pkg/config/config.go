@@ -20,10 +20,13 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -38,6 +41,17 @@ const FlagName = "config"
 
 // envAnnotation marks a flag with the environment variable that may set it.
 const envAnnotation = "gopskit.adnoctem.io/env"
+
+// Annotations on the root command: the top-level keys that hold documents rather than flag
+// settings, and the configuration file Load read.
+const (
+	documentsAnnotation = "gopskit.adnoctem.io/documents"
+	pathAnnotation      = "gopskit.adnoctem.io/config-path"
+)
+
+// MaxBytes bounds a configuration file, so a wrong path - a log file, a disk image - fails fast
+// instead of being read whole.
+const MaxBytes = 1 << 20 // 1 MiB
 
 // Settings is a parsed configuration file.
 type Settings map[string]any
@@ -99,7 +113,7 @@ func Find(app, explicit string) (string, error) {
 
 // Read parses the configuration file at path.
 func Read(path string) (Settings, error) {
-	raw, err := os.ReadFile(path)
+	raw, err := readFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +147,12 @@ func Load(app string, cmd *cobra.Command) error {
 			return fmt.Errorf("configuration file %s: %w", path, err)
 		}
 	}
+
+	root := cmd.Root()
+	if root.Annotations == nil {
+		root.Annotations = map[string]string{}
+	}
+	root.Annotations[pathAnnotation] = path
 
 	if err := Apply(cmd, s); err != nil {
 		if path != "" {
@@ -252,7 +272,15 @@ func set(fs *pflag.FlagSet, f *pflag.Flag, v any) error {
 // Validate checks that every key in s is a subcommand or a flag that exists where it is
 // written, so a typo in the file is an error instead of a setting silently ignored.
 func Validate(root *cobra.Command, s Settings) error {
-	return validate(root, s, nil)
+	// documents are decoded - and validated - by their own types, through Section
+	flags := Settings{}
+	for k, v := range s {
+		if !slices.Contains(documents(root), k) {
+			flags[k] = v
+		}
+	}
+
+	return validate(root, flags, nil)
 }
 
 func validate(cmd *cobra.Command, section map[string]any, at []string) error {
@@ -315,4 +343,115 @@ func hasFlag(cmd *cobra.Command, name string) bool {
 	}
 
 	return false
+}
+
+// AddDocument registers name as a top-level key of root's configuration file that holds a
+// document - structured data such as the Vault state waltr applies - rather than flag settings.
+// Its contents are read with Section.
+func AddDocument(root *cobra.Command, name string) {
+	if root.Annotations == nil {
+		root.Annotations = map[string]string{}
+	}
+
+	names := documents(root)
+	if !slices.Contains(names, name) {
+		names = append(names, name)
+	}
+	root.Annotations[documentsAnnotation] = strings.Join(names, ",")
+}
+
+func documents(root *cobra.Command) []string {
+	if raw := root.Annotations[documentsAnnotation]; raw != "" {
+		return strings.Split(raw, ",")
+	}
+
+	return nil
+}
+
+// Path is the configuration file Load read for cmd's CLI, or "" when there was none.
+func Path(cmd *cobra.Command) string {
+	return cmd.Root().Annotations[pathAnnotation]
+}
+
+// Section decodes the document name - registered with AddDocument - from the configuration file
+// Load read, into out. It reports false when there is no file or the file has no such key.
+//
+// Decoding is strict: a key out's type doesn't define is an error, because a misspelled key in a
+// document describing desired state would otherwise be silently ignored - a policy that should be
+// written, a secret that should exist - and look like a broken system rather than a broken file.
+// Errors carry the line numbers of the file itself.
+func Section(cmd *cobra.Command, name string, out any) (bool, error) {
+	path := Path(cmd)
+	if path == "" {
+		return false, nil
+	}
+
+	raw, err := readFile(path)
+	if err != nil {
+		return false, err
+	}
+
+	return decodeSection(raw, path, name, out)
+}
+
+// decodeSection decodes the top-level key name of the YAML document raw into out, strictly.
+//
+// The whole document is decoded, into a struct holding out under name and every other key in an
+// inline map. That makes KnownFields apply to out's type alone and keeps the line numbers of the
+// file in yaml.v3's errors, which decoding a re-encoded subtree would not.
+func decodeSection(raw []byte, path, name string, out any) (bool, error) {
+	target := reflect.ValueOf(out)
+	if target.Kind() != reflect.Pointer || target.IsNil() {
+		return false, fmt.Errorf("config.Section: out must be a non-nil pointer, got %T", out)
+	}
+
+	wrapper := reflect.StructOf([]reflect.StructField{
+		{
+			Name: "Section",
+			Type: target.Type(),
+			Tag:  reflect.StructTag(fmt.Sprintf(`yaml:%q`, name)),
+		},
+		{
+			Name: "Rest",
+			Type: reflect.TypeOf(map[string]any{}),
+			Tag:  `yaml:",inline"`,
+		},
+	})
+
+	doc := reflect.New(wrapper)
+	doc.Elem().Field(0).Set(target)
+
+	decoder := yaml.NewDecoder(bytes.NewReader(raw))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(doc.Interface()); err != nil {
+		if errors.Is(err, io.EOF) {
+			return false, nil
+		}
+		return false, fmt.Errorf("configuration file %s: %s: %w", path, name, err)
+	}
+
+	return hasKey(raw, name), nil
+}
+
+// hasKey reports whether the YAML document raw has the top-level key name.
+func hasKey(raw []byte, name string) bool {
+	var top map[string]yaml.Node
+	if err := yaml.Unmarshal(raw, &top); err != nil {
+		return false
+	}
+
+	_, ok := top[name]
+	return ok
+}
+
+func readFile(path string) ([]byte, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.Size() > MaxBytes {
+		return nil, fmt.Errorf("configuration file %s is %d bytes, the limit is %d", path, info.Size(), MaxBytes)
+	}
+
+	return os.ReadFile(path)
 }
