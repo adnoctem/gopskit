@@ -1,0 +1,54 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "cmd",
+    srcs = [
+        "cmd.go",
+        "init.go",
+    ],
+    importpath = "github.com/adnoctem/gopskit/internal/steppa/cmd",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/bridgecmd",
+        "//internal/steppa/app",
+        "//pkg/api/vault",
+        "//pkg/config",
+        "//pkg/smallstep",
+        "@com_github_spf13_cobra//:cobra",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+        "@io_k8s_apimachinery//pkg/api/errors",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":cmd",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "cmd_test",
+    # the tests run Vault and a k3s cluster in containers, skipping themselves when there is no Docker daemon
+    size = "enormous",
+    srcs = [
+        "chart_test.go",
+        "cmd_test.go",
+    ],
+    embed = [":cmd"],
+    tags = ["requires-network"],
+    deps = [
+        "//internal/steppa/app",
+        "//pkg/api/vault",
+        "//pkg/api/vault/vaulttest",
+        "//pkg/helm",
+        "//pkg/kube",
+        "//pkg/kube/k3stest",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_client_go//kubernetes/fake",
+    ],
+)

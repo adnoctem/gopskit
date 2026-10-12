@@ -5,10 +5,24 @@ go_library(
     srcs = ["main.go"],
     importpath = "github.com/adnoctem/gopskit/cmd/steppa",
     visibility = ["//visibility:private"],
+    x_defs = {
+        "github.com/adnoctem/gopskit/pkg/stamp.Version": "{STABLE_GOPSKIT_VERSION}",
+        "github.com/adnoctem/gopskit/pkg/stamp.BuildDate": "{BUILD_DATE}",
+        "github.com/adnoctem/gopskit/pkg/stamp.CommitSHA": "{GIT_COMMIT_SHA}",
+        "github.com/adnoctem/gopskit/pkg/stamp.Branch": "{GIT_BRANCH}",
+        "github.com/adnoctem/gopskit/pkg/stamp.Platform": "{PLATFORM}",
+        "github.com/adnoctem/gopskit/pkg/stamp.GoVersion": "{GO_VERSION}",
+    },
+    deps = [
+        "//internal/steppa/app",
+        "//internal/steppa/cmd",
+        "//pkg/stamp",
+    ],
 )
 
 go_binary(
     name = "steppa",
+    out = "steppa",
     embed = [":steppa_lib"],
     visibility = ["//visibility:public"],
 )

@@ -1,0 +1,47 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "smallstep",
+    srcs = [
+        "chart.go",
+        "pki.go",
+    ],
+    importpath = "github.com/adnoctem/gopskit/pkg/smallstep",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//pkg/helpers",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@org_golang_x_crypto//ssh",
+        "@sm_step_go_crypto//jose",
+        "@sm_step_go_crypto//keyutil",
+        "@sm_step_go_crypto//pemutil",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":smallstep",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "smallstep_test",
+    # the step-ca test runs step-ca in a container, skipping themselves when there is no Docker daemon
+    size = "large",
+    srcs = [
+        "pki_test.go",
+        "stepca_test.go",
+    ],
+    embed = [":smallstep"],
+    tags = ["requires-network"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@com_github_testcontainers_testcontainers_go//:testcontainers-go",
+        "@com_github_testcontainers_testcontainers_go//wait",
+        "@org_golang_x_crypto//ssh",
+        "@sm_step_go_crypto//jose",
+        "@sm_step_go_crypto//pemutil",
+    ],
+)
