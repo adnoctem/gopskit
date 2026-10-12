@@ -1,3 +1,26 @@
+## [1.3.0](https://github.com/adnoctem/gopskit/compare/v1.2.0...v1.3.0) (2026-10-12)
+
+### Features
+
+* **carto:** show diff as a unified diff ([e903f01](https://github.com/adnoctem/gopskit/commit/e903f01e0825fd958b39a9a528233346744b6c46))
+* **config:** decode typed document sections from the configuration file ([0b053f3](https://github.com/adnoctem/gopskit/commit/0b053f377dd9ad8993254f9292ef3509117f1b0d))
+* **steppa:** create certificate authorities for the step-certificates chart ([3bf056c](https://github.com/adnoctem/gopskit/commit/3bf056c5928078134a04aea714aac059c0dcac3c))
+
+### Bug Fixes
+
+* **carto:** describe diff, exec -C and --environment accurately ([aba59b4](https://github.com/adnoctem/gopskit/commit/aba59b4e3f1fc26e3f0e1d54afb60346904a947f))
+* **carto:** handle release history errors and pick hook pods reliably ([94ece96](https://github.com/adnoctem/gopskit/commit/94ece96b1e40aa725da92cff9caebeeb27626bc5))
+* **pkg/helpers:** draw passphrases from crypto/rand and stop exiting 0 on Ctrl+C ([2666640](https://github.com/adnoctem/gopskit/commit/26666408e104258d1407b4f5fce4810db0571979))
+* **pkg/kube:** find the kubeconfig as kubectl does and allow choosing a context ([9486d27](https://github.com/adnoctem/gopskit/commit/9486d27c5ca6e31aa977345328c214fc6756511f))
+* **plattr:** clarify passphrase rules for the encryption commands ([0edd57a](https://github.com/adnoctem/gopskit/commit/0edd57a3ea98623b3622306d7c4eb15b20808b5a))
+* **plattr:** require the namespaces to reflect Secrets into ([14fb56f](https://github.com/adnoctem/gopskit/commit/14fb56f7298f30d3256389a5c2af394ebf64a278))
+* **plattr:** store usable DH params and stop mistaking errors for missing Secrets ([356fa96](https://github.com/adnoctem/gopskit/commit/356fa96fd9a6883a050b295c4881a897110b789a))
+* report errors when no subcommand was given instead of panicking ([3040f1d](https://github.com/adnoctem/gopskit/commit/3040f1dddbcd752d2bb1d60326bee735d2ae3400))
+* **ssolo:** keep other keys in Vault and say when the URL is missing ([304bb70](https://github.com/adnoctem/gopskit/commit/304bb70e5fd5fadcf7088be6511ea3ab74f77309))
+* **ssolo:** require realm names instead of assuming them ([d906f1e](https://github.com/adnoctem/gopskit/commit/d906f1e522392db127cdd20bb86c095e022c0076))
+* **steppa:** refuse to lose the root key's password or replace part of a CA ([0e5cb6f](https://github.com/adnoctem/gopskit/commit/0e5cb6f7729acd3bf825e199efcfeefffbc1e74f))
+* **waltr:** keep recovery keys and stop failing the first auto-unseal init ([41d321b](https://github.com/adnoctem/gopskit/commit/41d321b270318dee8e9bba47a72d12d19c42e8b1))
+
 ## [1.2.0](https://github.com/adnoctem/gopskit/compare/v1.1.2...v1.2.0) (2026-10-12)
 
 ### Features
