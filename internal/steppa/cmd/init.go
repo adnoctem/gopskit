@@ -77,8 +77,10 @@ The CA goes to every --output given:
 A CA is created once: running init again would create a different one and invalidate every
 certificate the first one issued. So no output replaces an existing CA without --force.
 
-step-ca never needs the root key, so it is kept out of the cluster unless --include-root-key is
-given; it must then be kept elsewhere: in Vault, or in the --root-backup file.`,
+step-ca never needs the root key, so it stays out of the cluster unless --include-root-key is given.
+It has to be kept somewhere, so init refuses to run unless it goes to Vault (--output vault), to a
+--root-backup file, or into the cluster with --include-root-key. The cluster outputs never hold the
+root key's password: with the key only in the cluster, give --root-password yourself.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runInit(cmd.Context(), steppa, &f, cmd.OutOrStdout())
@@ -102,7 +104,7 @@ given; it must then be kept elsewhere: in Vault, or in the --root-backup file.`,
 	fs.StringSliceVarP(&f.outputs, "output", "o", []string{outputValues}, "Where to write the CA: values, kubernetes, vault (repeatable)")
 	fs.StringVar(&f.release, "release", smallstep.ChartName, "The chart's release name, which its Secrets are named for")
 	fs.StringVar(&f.namespace, "namespace", "",
-		"The release's namespace; also adds the chart Service's in-cluster names to --dns")
+		"The release's namespace, required for --output kubernetes; also adds the chart Service's in-cluster names to --dns")
 	fs.StringVar(&f.valuesFile, "values-file", "", "Where --output values writes the chart values; - for stdout (default: RELEASE-values.yaml)")
 	fs.StringVar(&f.rootBackup, "root-backup", "",
 		"A file to store the root certificate, its encrypted key and its password in - keep it offline")
@@ -110,7 +112,7 @@ given; it must then be kept elsewhere: in Vault, or in the --root-backup file.`,
 	fs.BoolVar(&f.force, "force", false, "Replace an existing CA in the outputs, invalidating every certificate it issued")
 
 	fs.StringVar(&f.vaultAddr, "vault-addr", "", "Vault's address for --output vault")
-	fs.StringVar(&f.vaultToken, "vault-token", "", "A Vault token allowed to write --vault-path")
+	fs.StringVar(&f.vaultToken, "vault-token", "", "A Vault token allowed to read and write --vault-path")
 	fs.StringVar(&f.vaultMount, "vault-mount", "kv", "The KV-v2 secrets engine's mount path")
 	fs.StringVar(&f.vaultPath, "vault-path", "", "The secret's path within the mount (default: RELEASE/ca)")
 	fs.StringSliceVar(&f.vaultCACerts, "vault-ca-cert", nil, "A PEM CA certificate to trust for Vault's TLS certificate (repeatable)")
@@ -238,9 +240,17 @@ func (f *initFlags) validate() error {
 		}
 	}
 
-	if !f.includeRootKey && !f.wants(outputVault) && f.rootBackup == "" {
+	keptOutsideCluster := f.wants(outputVault) || f.rootBackup != ""
+	if !f.includeRootKey && !keptOutsideCluster {
 		return errors.New("the root CA key would not be kept anywhere, and without it no new intermediate CA " +
 			"can ever be issued: use --output vault, --root-backup FILE or --include-root-key")
+	}
+
+	// the cluster outputs carry the encrypted root key but never its password, which only Vault and
+	// the root backup hold - a generated one would be lost, leaving the key useless
+	if f.includeRootKey && !keptOutsideCluster && f.opts.Passwords.Root == "" {
+		return errors.New("with the root key only in the cluster, its password would be stored nowhere: " +
+			"give --root-password (and keep it safe), or use --output vault or --root-backup FILE")
 	}
 
 	return nil
@@ -278,13 +288,15 @@ func (f *initFlags) checkNothingExists(ctx context.Context, s *app.State) error 
 			return err
 		}
 
-		name := smallstep.Fullname(f.release) + "-ca-password"
-		_, err = kc.Client.CoreV1().Secrets(f.namespace).Get(ctx, name, metav1.GetOptions{})
-		switch {
-		case err == nil:
-			return refuse(fmt.Sprintf("the Secret %s/%s", f.namespace, name))
-		case !apierrors.IsNotFound(err):
-			return fmt.Errorf("could not look up Secret %s/%s: %w", f.namespace, name, err)
+		// any one of them is enough to refuse: partly replacing a CA breaks it just as well
+		for _, name := range smallstep.SecretNames(f.release, true) {
+			_, err = kc.Client.CoreV1().Secrets(f.namespace).Get(ctx, name, metav1.GetOptions{})
+			switch {
+			case err == nil:
+				return refuse(fmt.Sprintf("the Secret %s/%s", f.namespace, name))
+			case !apierrors.IsNotFound(err):
+				return fmt.Errorf("could not look up Secret %s/%s: %w", f.namespace, name, err)
+			}
 		}
 	}
 
@@ -368,7 +380,7 @@ func (f *initFlags) writeSecrets(ctx context.Context, s *app.State, pki *smallst
 		case err != nil:
 			return fmt.Errorf("could not look up Secret %s/%s: %w", f.namespace, secret.Name, err)
 		default:
-			// only reached with --force
+			// only reached with --force: checkNothingExists refuses any existing Secret otherwise
 			have.Data, have.StringData, have.Labels = nil, secret.StringData, secret.Labels
 			if _, err := client.Update(ctx, have, metav1.UpdateOptions{}); err != nil {
 				return fmt.Errorf("could not replace Secret %s/%s: %w", f.namespace, secret.Name, err)

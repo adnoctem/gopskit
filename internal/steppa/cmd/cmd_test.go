@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 )
@@ -109,7 +110,7 @@ func TestKubernetesSecrets(t *testing.T) {
 	asrt := assert.New(t)
 	s, cs, _ := newState(t)
 
-	args := caArgs("--ssh", "--include-root-key", "-o", "kubernetes,values", "--values-file", "-", "--namespace", "pki")
+	args := caArgs("--ssh", "--include-root-key", "--root-password", "known", "-o", "kubernetes,values", "--values-file", "-", "--namespace", "pki")
 	stdout, err := run(t, s, args...)
 	require.NoError(t, err)
 
@@ -163,4 +164,27 @@ initialize:
 
 	_, err = run(t, s, "init", "--config", cfg)
 	asrt.ErrorContains(err, "already exists")
+}
+
+func TestRootKeyInClusterNeedsAKnownPassword(t *testing.T) {
+	s, _, _ := newState(t)
+
+	_, err := run(t, s, caArgs("--include-root-key")...)
+	assert.ErrorContains(t, err, "--root-password")
+
+	_, err = run(t, s, caArgs("--include-root-key", "--root-password", "kept-elsewhere")...)
+	assert.NoError(t, err)
+}
+
+func TestAnyExistingSecretBlocksAKubernetesRun(t *testing.T) {
+	s, cs, _ := newState(t)
+
+	// a leftover of an earlier CA, without its ca-password Secret
+	_, err := cs.CoreV1().Secrets("pki").Create(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "step-certificates-certs", Namespace: "pki"},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = run(t, s, caArgs("-o", "kubernetes", "--namespace", "pki", "--root-backup", "root.yaml")...)
+	assert.ErrorContains(t, err, "step-certificates-certs")
 }

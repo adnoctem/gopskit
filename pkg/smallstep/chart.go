@@ -102,6 +102,22 @@ func (p *PKI) ExistingSecretsValues() map[string]any {
 	}
 }
 
+// SecretNames are the names of the Secrets Secrets returns for release, without generating
+// anything - for checking whether a CA already exists.
+func SecretNames(release string, ssh bool) []string {
+	suffixes := []string{"secrets", "certs", "config", "ca-password", "provisioner-password"}
+	if ssh {
+		suffixes = append(suffixes, "ssh-host-ca-password", "ssh-user-ca-password")
+	}
+
+	names := make([]string, len(suffixes))
+	for i, s := range suffixes {
+		names[i] = Fullname(release) + "-" + s
+	}
+
+	return names
+}
+
 // Secrets returns the Secrets the chart's "existingSecrets" mode reads, named for release in
 // namespace - for GitOps setups where the CA must exist before the chart is installed. The root
 // key is only included with includeRootKey.
