@@ -17,6 +17,8 @@ bazel build //cmd/carto:carto
 
 # A backbone.yaml declaring the charts, and a charts/ directory with their values.
 cat backbone.yaml
+# namespaces:
+#   - name: vault
 # charts:
 #   vault:
 #     version: 0.29.1
@@ -52,6 +54,10 @@ from wherever `--backbone` (`-b`) points.
 > the first unknown key.
 
 ```yaml
+namespaces:
+  - name: vault
+  - name: keycloak
+
 globals:
   - path: globals/common.yaml
     applies: ["*"]
@@ -75,12 +81,12 @@ A map from chart name to its settings. The name does three jobs: it is the name 
 repository, the name of the Helm release, and the name of the chart's directory under
 `--charts-dir`. A release named differently from its chart cannot be declared.
 
-| Key          | Meaning                                                                      |
-| ------------ | ---------------------------------------------------------------------------- |
-| `version`    | The chart version to install or upgrade to.                                  |
-| `repository` | Where the chart comes from - see below.                                      |
-| `namespace`  | The namespace the release lives in. carto does not create it; it must exist. |
-| `hooks`      | Commands run around `apply` - see [Hooks](#hooks).                           |
+| Key          | Meaning                                                                               |
+| ------------ | ------------------------------------------------------------------------------------- |
+| `version`    | The chart version to install or upgrade to.                                           |
+| `repository` | Where the chart comes from - see below.                                               |
+| `namespace`  | The release namespace. It must already exist or be explicitly listed in `namespaces`. |
+| `hooks`      | Commands run around `apply` - see [Hooks](#hooks).                                    |
 
 `repository` takes three forms:
 
@@ -90,6 +96,52 @@ repository, the name of the Helm release, and the name of the chart's directory 
   appends the chart name, giving `oci://registry-1.docker.io/bitnamicharts/keycloak`.
 - Empty, for a chart on disk. The chart is then the directory named after the chart, relative to
   the working directory - `./vault` for a chart called `vault`.
+
+### `namespaces`
+
+An optional list of Kubernetes metadata objects. Only `name` is required; `labels` and
+`annotations` use the normal Kubernetes string maps. Carto supplies `apiVersion: v1`,
+`kind: Namespace` and the `metadata` wrapper:
+
+```yaml
+namespaces:
+  - name: cert-manager
+    labels:
+      adnoctem.co/env: dev
+    annotations:
+      adnoctem.co/purpose: Development certificate management
+  - name: traefik
+```
+
+Every `apply <chart>` reconciles **all** declared namespaces in list order, after loading the
+chart and values and before pre-apply hooks. A declaration need not match a chart's namespace.
+`charts.<name>.namespace` alone never creates a namespace: if it is undeclared and missing, the
+caller must create it. Omitting `namespaces`, setting it to `[]`, or setting it to `null` makes
+no namespace API calls and requires no namespace permissions. Declarations do not vary with
+`--environment`; use a dedicated backbone file for development.
+
+Names must be valid Kubernetes namespace names and unique within the list. Label/annotation
+values must be strings; quote values such as `"true"` and `"123"`. Only `name`, `labels` and
+`annotations` are accepted. Server metadata, finalizers, owner references and full resource
+wrappers are rejected. Invalid declarations fail before cluster access, including on read-only
+commands.
+
+Carto uses server-side apply with field manager `carto-namespaces` and never forces ownership
+conflicts. Existing unrelated labels, annotations and namespace fields are preserved. Changing
+a field owned by another actor fails; equal values can share ownership. Omitting a metadata key
+previously owned solely by Carto removes that key. Empty or null label/annotation maps have the
+same effect. Use one authoritative backbone declaration per namespace.
+
+Removing a namespace declaration stops managing it; it never deletes the namespace. Namespace
+changes remain after a hook or Helm failure and are not undone by rollback. An apply fails if a
+declared namespace is terminating or cannot be reconciled; earlier namespace successes remain.
+The caller needs cluster-scoped `get`, `create` and `patch` permissions on core `namespaces`,
+in addition to Helm/chart permissions. Carto grants no RBAC automatically.
+
+Only `apply` reconciles namespaces. `render` stays offline and prints merged values only. `diff`
+shows the generated namespace declarations separately from the Helm manifest diff, without
+reading or writing namespaces; it does not detect live namespace drift or ownership conflicts.
+`history`, `logs`, `exec` and `rollback` do not automatically manage namespaces.
 
 ### `globals`
 
@@ -243,25 +295,52 @@ The render does not contact the cluster, so templates that use `lookup` or check
 versions can render differently here than they do during `apply`. Helm hooks of the chart are not
 part of the compared manifests.
 
+When `namespaces` is nonempty, the output begins with the generated Namespace declarations,
+labelled as desired configuration rather than a live namespace diff. The Helm comparison follows;
+an unchanged chart says `no chart manifest differences`. Namespace resources are managed outside
+the Helm release and are not included in its stored manifest.
+
 ### `apply`
 
 ```sh
 carto apply vault -e prod
+carto apply vault -e prod --wait-for-jobs=false --timeout 5m
 ```
 
 Installs the chart if it has no release yet (or its release was uninstalled), and upgrades it
 otherwise. In order:
 
-1. load `backbone.yaml`, merge the values, fetch the chart
-2. run the `pre-apply` hooks
-3. install or upgrade
-4. on an install, run the `first-install` hooks
-5. run the `post-apply` hooks
+1. load and validate `backbone.yaml`, merge the values, fetch the chart and check release history
+2. reconcile every explicitly declared namespace
+3. run the `pre-apply` hooks
+4. install or upgrade
+5. on an install, run the `first-install` hooks
+6. run the `post-apply` hooks
 
-The install or upgrade is atomic and waits for the release's resources to become ready, for at most
-10 minutes. A failed install is removed again; a failed upgrade is rolled back to the previous
-revision, and resources it created are deleted. A failing hook after step 3 fails the command but
-leaves the new release in place.
+The install or upgrade is atomic and waits for the release's resources to become ready, including
+Jobs completing successfully by default. `--wait-for-jobs=false` skips waiting for ordinary Jobs;
+readiness waits for other resources and Helm's hook handling still apply. Earlier Carto versions
+did not include ordinary Jobs in readiness waits.
+
+`--timeout` sets Helm's timeout for resource waits and Kubernetes operations, defaults to `10m`,
+and accepts a positive Go duration such as `90s` or `5m`. This is not a deadline for the whole
+Carto command: hooks and atomic failure recovery can take additional time. Both settings apply
+to installs and upgrades, including an upgrade's automatic rollback, and can be set in
+`carto.yaml`:
+
+```yaml
+apply:
+  wait-for-jobs: true
+  timeout: 5m
+```
+
+Command-line flags override the file. These settings belong in `carto.yaml`, not `backbone.yaml`.
+They do not change the separate `rollback` command's behavior.
+
+A failed install is removed again; a failed upgrade is rolled back to the previous
+revision, and resources it created are deleted. A failing hook after step 4 fails the command but
+leaves the new release in place. Declared namespaces remain even if Helm or a hook fails. Helm's
+template/schema/cluster validation can still fail at step 4 after namespace reconciliation.
 
 ### `history`
 
@@ -367,6 +446,9 @@ infra/
 `backbone.yaml`:
 
 ```yaml
+namespaces:
+  - name: vault
+
 globals:
   - path: globals/common.yaml
     applies: ["*"]
@@ -456,3 +538,74 @@ unsealed, which makes it a check rather than a step.
 
 For production, `carto apply vault -e prod --context prod-admin`, or a second `carto.yaml` with
 `context: prod-admin` and `environment: prod` on the machine that deploys to production.
+
+## Development bootstrap with cert-manager and Traefik
+
+The [complete development example](examples/backbone.yaml) declares both namespaces and
+pins the two charts:
+
+```yaml
+namespaces:
+  - name: cert-manager
+    labels:
+      adnoctem.co/env: dev
+  - name: traefik
+    labels:
+      adnoctem.co/env: dev
+
+charts:
+  cert-manager:
+    repository: https://charts.jetstack.io
+    version: "v1.21.3"
+    namespace: cert-manager
+  traefik:
+    repository: https://traefik.github.io/charts
+    version: "42.4.2"
+    namespace: traefik
+```
+
+The example's [cert-manager values](examples/cert-manager/values.dev.yaml) enable
+CRD installation and the startup API check. Its
+[Traefik values](examples/traefik/values.dev.yaml) preserve the sibling charts
+repository's kind setup: an `ingress-ready=true` control-plane node with host ports 80/443,
+a ClusterIP service, and Kubernetes Ingress/CRD providers. These values assume that existing
+kind configuration; they are not a general cluster provisioning recipe.
+
+The example layout is:
+
+```text
+examples/
+  backbone.yaml
+  cert-manager/
+    values.dev.yaml
+  traefik/
+    values.dev.yaml
+```
+
+Use `--charts-dir examples` with this layout. Copy `backbone.yaml` and the two chart directories
+to the sibling repository's `config/k8s/` and use that directory as `--charts-dir` there.
+Its Make recipe can then use the existing development context and CA/ClusterIssuer manifests:
+
+<!-- markdownlint-disable MD010 -->
+
+```makefile
+carto := carto
+
+.PHONY: cluster-bootstrap
+cluster-bootstrap:
+	$(carto) apply cert-manager \
+		--backbone "$(CONFIG_K8S_DIR)/backbone.yaml" --charts-dir "$(CONFIG_K8S_DIR)" \
+		--environment dev --context "kind-$(PROJ_NAME)"
+	$(carto) apply traefik \
+		--backbone "$(CONFIG_K8S_DIR)/backbone.yaml" --charts-dir "$(CONFIG_K8S_DIR)" \
+		--environment dev --context "kind-$(PROJ_NAME)"
+	$(kubectl) --context "kind-$(PROJ_NAME)" apply -k "$(CONFIG_K8S_DIR)/kustomize"
+	$(kubectl) --context "kind-$(PROJ_NAME)" wait --for=condition=Ready clusterissuer/development-issuer --timeout=120s
+```
+
+<!-- markdownlint-enable MD010 -->
+
+The first apply reconciles both namespaces; the second safely repeats that step. No separate
+namespace manifest is needed. The existing local CA generation must still run before Kustomize
+applies its Secret and ClusterIssuer, and the issuer's explicit Ready wait remains necessary.
+Use a Carto build containing namespace support: older binaries silently ignore this backbone key.

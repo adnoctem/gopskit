@@ -8,12 +8,23 @@ import (
 	apihelm "github.com/adnoctem/gopskit/pkg/helm"
 	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/chart"
 )
 
 var _ app.CLIOpt = NewDiffCommand // assure type compatibility
 
 // NewDiffCommand creates the Option which injects the 'diff' subcommand into the 'carto' CLI
 func NewDiffCommand(a *app.State) *cobra.Command {
+	return newDiffCommand(a, func(namespace string) (diffHelm, error) { return a.HelmClient(namespace) })
+}
+
+type diffHelm interface {
+	LoadChart(name, repository, version string) (*chart.Chart, error)
+	RenderManifest(name string, ch *chart.Chart, vals map[string]interface{}) (string, error)
+	CurrentManifest(name string) (string, error)
+}
+
+func newDiffCommand(a *app.State, helmClient func(string) (diffHelm, error)) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:              "diff <chart>",
 		Short:            "Show a unified diff from the deployed release to the local chart render",
@@ -41,7 +52,7 @@ func NewDiffCommand(a *app.State) *cobra.Command {
 				return err
 			}
 
-			hc, err := a.HelmClient(cc.Namespace)
+			hc, err := helmClient(cc.Namespace)
 			if err != nil {
 				return err
 			}
@@ -65,14 +76,21 @@ func NewDiffCommand(a *app.State) *cobra.Command {
 				return fmt.Errorf("could not fetch the current manifest of %q: %w", name, err)
 			}
 
+			if err := previewNamespaces(cmd.OutOrStdout(), cfg.Namespaces); err != nil {
+				return err
+			}
 			d := apihelm.ManifestDiff(current, proposed)
 			if d == "" {
-				fmt.Println("no differences")
-				return nil
+				message := "no differences"
+				if len(cfg.Namespaces) > 0 {
+					message = "no chart manifest differences"
+				}
+				_, err := fmt.Fprintln(cmd.OutOrStdout(), message)
+				return err
 			}
 
-			fmt.Print(d)
-			return nil
+			_, err = fmt.Fprint(cmd.OutOrStdout(), d)
+			return err
 		},
 	}
 

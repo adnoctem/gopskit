@@ -1,6 +1,6 @@
 // Package config implements parsing for carto's backbone.yaml configuration file, which declares
 // the set of Helm charts carto manages ("backbone components") along with their global values
-// overlays and lifecycle hooks.
+// overlays, lifecycle hooks and explicitly managed namespaces.
 package config
 
 import (
@@ -120,6 +120,9 @@ type ChartConfig struct {
 
 // Config is the parsed contents of a backbone.yaml file
 type Config struct {
+	// Namespaces contains only the namespace metadata explicitly managed by apply.
+	Namespaces Namespaces `yaml:"namespaces,omitempty"`
+
 	// Globals are values files merged into charts matching their Applies list
 	Globals []GlobalValues `yaml:"globals,omitempty"`
 

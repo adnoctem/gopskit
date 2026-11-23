@@ -9,6 +9,7 @@ go_library(
         "exec.go",
         "history.go",
         "logs.go",
+        "namespaces.go",
         "render.go",
         "rollback.go",
         "values.go",
@@ -27,6 +28,9 @@ go_library(
         "@in_gopkg_yaml_v3//:yaml_v3",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_client_go//applyconfigurations/core/v1:core",
+        "@sh_helm_helm_v3//pkg/chart",
+        "@sh_helm_helm_v3//pkg/release",
     ],
 )
 
@@ -38,13 +42,25 @@ alias(
 
 go_test(
     name = "cmd_test",
-    srcs = ["cmd_test.go"],
+    srcs = [
+        "cmd_test.go",
+        "namespaces_test.go",
+    ],
     embed = [":cmd"],
     deps = [
         "//internal/carto/app",
+        "//pkg/helm",
+        "//pkg/kube",
+        "@com_github_spf13_cobra//:cobra",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/runtime",
+        "@io_k8s_cli_runtime//pkg/genericclioptions",
+        "@io_k8s_client_go//kubernetes/fake",
+        "@io_k8s_client_go//testing",
+        "@sh_helm_helm_v3//pkg/chart",
+        "@sh_helm_helm_v3//pkg/release",
     ],
 )

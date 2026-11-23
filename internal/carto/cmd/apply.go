@@ -3,11 +3,15 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/adnoctem/gopskit/internal/carto/app"
 	"github.com/adnoctem/gopskit/internal/carto/config"
+	apihelm "github.com/adnoctem/gopskit/pkg/helm"
 	"github.com/adnoctem/gopskit/pkg/proc"
 	"github.com/spf13/cobra"
+	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -16,12 +20,31 @@ var _ app.CLIOpt = NewApplyCommand // assure type compatibility
 
 // NewApplyCommand creates the Option which injects the 'apply' subcommand into the 'carto' CLI
 func NewApplyCommand(a *app.State) *cobra.Command {
+	return newApplyCommand(a, func(namespace string) (applyHelm, error) { return a.HelmClient(namespace) })
+}
+
+type applyHelm interface {
+	LoadChart(name, repository, version string) (*chart.Chart, error)
+	Installed(name string) (bool, error)
+	Apply(name string, ch *chart.Chart, vals map[string]interface{}, opts ...apihelm.ApplyOption) (*release.Release, error)
+}
+
+func newApplyCommand(a *app.State, helmClient func(string) (applyHelm, error)) *cobra.Command {
+	var waitForJobs bool
+	var timeout time.Duration
+
 	cmd := &cobra.Command{
 		Use:              "apply <chart>",
 		Short:            "Render, then install or upgrade a chart",
-		Long:             "Runs the full Render -> pre-apply hooks -> Upgrade/Install -> first-install/post-apply hooks loop for a chart",
+		Long:             "Loads the chart and values, reconciles declared namespaces, then runs pre-apply hooks, install/upgrade and first-install/post-apply hooks",
 		Args:             cobra.ExactArgs(1),
 		TraverseChildren: true,
+		PreRunE: func(_ *cobra.Command, _ []string) error {
+			if timeout <= 0 {
+				return fmt.Errorf("timeout must be greater than zero")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 			configPath := proc.Must(cmd.Flags().GetString("backbone"))
@@ -43,7 +66,7 @@ func NewApplyCommand(a *app.State) *cobra.Command {
 				return err
 			}
 
-			hc, err := a.HelmClient(cc.Namespace)
+			hc, err := helmClient(cc.Namespace)
 			if err != nil {
 				return err
 			}
@@ -59,6 +82,18 @@ func NewApplyCommand(a *app.State) *cobra.Command {
 			}
 			firstInstall := !installed
 
+			if len(cfg.Namespaces) > 0 {
+				kc, err := a.KubeClient()
+				if err != nil {
+					return err
+				}
+				for _, meta := range cfg.Namespaces {
+					if err := kc.ReconcileNamespace(cmd.Context(), meta); err != nil {
+						return err
+					}
+				}
+			}
+
 			pod, hasPod, err := releasePod(a, cc.Namespace, name)
 			if err != nil {
 				return err
@@ -68,7 +103,8 @@ func NewApplyCommand(a *app.State) *cobra.Command {
 				return fmt.Errorf("pre-apply hooks failed: %w", err)
 			}
 
-			rel, err := hc.Apply(name, ch, vals)
+			rel, err := hc.Apply(name, ch, vals,
+				apihelm.WithWaitForJobs(waitForJobs), apihelm.WithApplyTimeout(timeout))
 			if err != nil {
 				return fmt.Errorf("could not apply chart %q: %w", name, err)
 			}
@@ -94,6 +130,9 @@ func NewApplyCommand(a *app.State) *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&waitForJobs, "wait-for-jobs", true, "Wait for Jobs to complete before marking the release successful")
+	cmd.Flags().DurationVar(&timeout, "timeout", apihelm.DefaultApplyTimeout, "Timeout for Helm resource waits and Kubernetes operations (must be positive)")
 
 	return cmd
 }

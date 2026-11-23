@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/adnoctem/gopskit/internal/carto/app"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -115,6 +116,65 @@ func TestPickPod(t *testing.T) {
 
 	_, ok = pickPod([]corev1.Pod{pod("gone", corev1.PodRunning, true, true), pod("waiting", corev1.PodPending, false, false)})
 	asrt.False(ok, "terminating and pending pods are never picked")
+}
+
+func TestApplySettings(t *testing.T) {
+	for _, tt := range []struct {
+		name, settings string
+		args           []string
+		jobs           bool
+		timeout        time.Duration
+	}{
+		{name: "defaults", jobs: true, timeout: 10 * time.Minute},
+		{name: "top-level settings", settings: "wait-for-jobs: false\ntimeout: 3m\n", timeout: 3 * time.Minute},
+		{name: "apply settings", settings: "apply:\n  wait-for-jobs: false\n  timeout: 5m\n", timeout: 5 * time.Minute},
+		{name: "scoped settings win", settings: "wait-for-jobs: true\ntimeout: 1m\napply:\n  wait-for-jobs: false\n  timeout: 2m\n", timeout: 2 * time.Minute},
+		{name: "CLI enables Jobs", settings: "apply:\n  wait-for-jobs: false\n  timeout: 5m\n", args: []string{"--wait-for-jobs", "--timeout", "90s"}, jobs: true, timeout: 90 * time.Second},
+		{name: "CLI disables Jobs", settings: "apply:\n  wait-for-jobs: true\n", args: []string{"--wait-for-jobs=false"}, timeout: 10 * time.Minute},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := NewRootCommand(newState(t))
+			path := write(t, filepath.Join(t.TempDir(), "carto.yaml"), tt.settings)
+			apply, _, err := root.Find([]string{"apply"})
+			require.NoError(t, err)
+			// Exercise the real flag/configuration/pre-run pipeline without contacting a cluster.
+			called := false
+			apply.RunE = func(cmd *cobra.Command, _ []string) error {
+				called = true
+				jobs, err := cmd.Flags().GetBool("wait-for-jobs")
+				require.NoError(t, err)
+				timeout, err := cmd.Flags().GetDuration("timeout")
+				require.NoError(t, err)
+				assert.Equal(t, tt.jobs, jobs)
+				assert.Equal(t, tt.timeout, timeout)
+				return nil
+			}
+			root.SetArgs(append([]string{"apply", "vault", "--config", path}, tt.args...))
+			require.NoError(t, root.Execute())
+			assert.True(t, called)
+		})
+	}
+}
+
+func TestApplyRejectsInvalidTimeout(t *testing.T) {
+	for _, settings := range []bool{false, true} {
+		for _, value := range []string{"0s", "-1s", "soon"} {
+			t.Run(value+"/"+map[bool]string{false: "CLI", true: "config"}[settings], func(t *testing.T) {
+				root := NewRootCommand(newState(t))
+				args := []string{"apply", "vault"}
+				if settings {
+					path := write(t, filepath.Join(t.TempDir(), "carto.yaml"), "apply:\n  timeout: "+value+"\n")
+					args = append(args, "--config", path)
+				} else {
+					args = append(args, "--timeout="+value)
+				}
+				root.SetArgs(args)
+				err := root.Execute()
+				require.ErrorContains(t, err, "timeout")
+				assert.NotContains(t, err.Error(), "backbone", "validation must precede config and cluster work")
+			})
+		}
+	}
 }
 
 type discard struct{}

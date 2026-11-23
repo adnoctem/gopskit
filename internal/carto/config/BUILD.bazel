@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "config.go",
         "hooks.go",
+        "namespaces.go",
     ],
     importpath = "github.com/adnoctem/gopskit/internal/carto/config",
     visibility = ["//:__subpackages__"],
@@ -15,6 +16,10 @@ go_library(
         "//pkg/proc",
         "@in_gopkg_yaml_v3//:yaml_v3",
         "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/api/validation",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1/validation",
+        "@io_k8s_apimachinery//pkg/util/validation/field",
     ],
 )
 
@@ -29,6 +34,7 @@ go_test(
     srcs = [
         "config_test.go",
         "hooks_test.go",
+        "namespaces_test.go",
     ],
     embed = [":config"],
     deps = [
