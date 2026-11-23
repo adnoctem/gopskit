@@ -45,6 +45,7 @@ go_test(
     srcs = [
         "cmd_test.go",
         "namespaces_test.go",
+        "settings_test.go",
     ],
     embed = [":cmd"],
     deps = [

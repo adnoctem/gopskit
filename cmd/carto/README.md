@@ -219,8 +219,10 @@ charts/
 3. `<charts-dir>/<chart>/values.<environment>.yaml`
 
 A later file overrides an earlier one. Both files under `<charts-dir>` are optional; a chart with
-none of the three gets the chart's own defaults. `--charts-dir` defaults to `charts` and is
-relative to the working directory, not to `backbone.yaml`.
+none of the three gets the chart's own defaults. `--charts-dir` defaults to `charts` in the
+working directory. A relative `charts-dir` configured in `carto.yaml` is resolved against that
+settings file's directory; a relative CLI `--charts-dir` stays relative to the working directory.
+Neither form resolves against `backbone.yaml`.
 
 The merge is a deep merge of maps:
 
@@ -413,6 +415,29 @@ logs:
 
 [`docs/configuration.md`](../../docs/configuration.md) describes the file in full; it is the same
 for every gopskit CLI.
+
+Carto resolves explicitly configured relative `backbone` and `charts-dir` paths against the
+directory containing the selected settings file. This applies to `--config` and discovered
+local, user and system settings, including settings scoped under a command such as `apply`.
+Command-line `--backbone` and `--charts-dir` override the file and resolve relative paths against
+the invocation directory. Absolute paths are unchanged. If either path is not configured,
+its default (`backbone.yaml` or `charts`) remains relative to the invocation directory.
+
+For example, `/srv/infra/carto.yaml` can contain:
+
+```yaml
+backbone: backbone.yaml
+charts-dir: charts
+```
+
+`carto render vault --config /srv/infra/carto.yaml` then reads `/srv/infra/backbone.yaml` and
+`/srv/infra/charts/vault/` from any working directory. Adding `--charts-dir ./overrides` uses
+`./overrides/vault/` in the invocation directory instead, while keeping the configured backbone.
+
+This corrects the earlier invocation-relative handling of paths in `carto.yaml`. Existing settings
+that relied on that behavior should use paths relative to the settings file, absolute paths, or
+explicit CLI flags. Global values paths still resolve against `backbone.yaml`; local chart paths,
+local hook paths and other path flags retain their existing behavior.
 
 ### Choosing the cluster
 
