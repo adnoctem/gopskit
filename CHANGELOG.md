@@ -1,3 +1,9 @@
+## [1.4.0](https://github.com/adnoctem/gopskit/compare/v1.3.0...v1.4.0) (2026-11-23)
+
+### Features
+
+* **carto:** manage explicit namespaces and configure Helm waits ([c1cd272](https://github.com/adnoctem/gopskit/commit/c1cd272e64de0f5fc0e2cdb5b990c943dd61fd9e))
+
 ## [1.3.0](https://github.com/adnoctem/gopskit/compare/v1.2.0...v1.3.0) (2026-10-12)
 
 ### Features
