@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/adnoctem/gopskit/compare/v1.4.0...v1.4.1) (2026-11-23)
+
+### Bug Fixes
+
+* **carto:** resolve configured paths from the settings directory ([65eed02](https://github.com/adnoctem/gopskit/commit/65eed02cdadeb543d5d8a6ffbdda8b76a9dcd503))
+
 ## [1.4.0](https://github.com/adnoctem/gopskit/compare/v1.3.0...v1.4.0) (2026-11-23)
 
 ### Features
